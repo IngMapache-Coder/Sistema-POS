@@ -1,21 +1,23 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { AppSidebar } from "@/components/layout/app-sidebar"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { useToast } from "@/hooks/use-toast"
-import { getConfig, updateConfig } from "@/lib/database"
-import type { SystemConfig } from "@/lib/types"
+import { InputNumber } from '@/components/ui/input-number'
+import { useState, useEffect } from "react";
+import { AppSidebar } from "@/components/layout/app-sidebar";
+import { Button } from "@/components/ui/button";
 import {
-  Settings,
-  Building2,
-  Save,
-  RotateCcw,
-} from "lucide-react"
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
+import { getConfig, updateConfig } from "@/lib/database";
+import type { SystemConfig } from "@/lib/types";
+import { Settings, Building2, Save, RotateCcw } from "lucide-react";
 
 export default function ConfiguracionPage() {
   const [config, setConfig] = useState<SystemConfig>({
@@ -24,34 +26,36 @@ export default function ConfiguracionPage() {
     businessName: "",
     businessAddress: "",
     businessPhone: "",
-  })
-  const [hasChanges, setHasChanges] = useState(false)
-  const { toast } = useToast()
+    businessNIT: "",
+    dailyBase: 0,
+  });
+  const [hasChanges, setHasChanges] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
-    const savedConfig = getConfig()
-    setConfig(savedConfig)
-  }, [])
+    const savedConfig = getConfig();
+    setConfig(savedConfig);
+  }, []);
 
   const handleChange = (key: keyof SystemConfig, value: string | number) => {
-    setConfig(prev => ({ ...prev, [key]: value }))
-    setHasChanges(true)
-  }
+    setConfig((prev) => ({ ...prev, [key]: value }));
+    setHasChanges(true);
+  };
 
   const handleSave = () => {
-    updateConfig(config)
-    setHasChanges(false)
+    updateConfig(config);
+    setHasChanges(false);
     toast({
       title: "Configuración guardada",
       description: "Los cambios se han guardado correctamente",
-    })
-  }
+    });
+  };
 
   const handleReset = () => {
-    const savedConfig = getConfig()
-    setConfig(savedConfig)
-    setHasChanges(false)
-  }
+    const savedConfig = getConfig();
+    setConfig(savedConfig);
+    setHasChanges(false);
+  };
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -60,11 +64,17 @@ export default function ConfiguracionPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold">Configuración del Sistema</h1>
-            <p className="text-muted-foreground">Personaliza la información de tu negocio</p>
+            <p className="text-muted-foreground">
+              Personaliza la información de tu negocio
+            </p>
           </div>
           {hasChanges && (
             <div className="flex gap-2">
-              <Button variant="outline" onClick={handleReset} className="gap-2 bg-transparent">
+              <Button
+                variant="outline"
+                onClick={handleReset}
+                className="gap-2 bg-transparent"
+              >
                 <RotateCcw className="h-4 w-4" />
                 Descartar
               </Button>
@@ -95,7 +105,9 @@ export default function ConfiguracionPage() {
                   <Input
                     id="businessName"
                     value={config.businessName}
-                    onChange={(e) => handleChange("businessName", e.target.value)}
+                    onChange={(e) =>
+                      handleChange("businessName", e.target.value)
+                    }
                     placeholder="Mi Restaurante"
                   />
                 </div>
@@ -104,7 +116,9 @@ export default function ConfiguracionPage() {
                   <Input
                     id="businessAddress"
                     value={config.businessAddress}
-                    onChange={(e) => handleChange("businessAddress", e.target.value)}
+                    onChange={(e) =>
+                      handleChange("businessAddress", e.target.value)
+                    }
                     placeholder="Calle Principal #123, Ciudad"
                   />
                 </div>
@@ -113,9 +127,37 @@ export default function ConfiguracionPage() {
                   <Input
                     id="businessPhone"
                     value={config.businessPhone}
-                    onChange={(e) => handleChange("businessPhone", e.target.value)}
+                    onChange={(e) =>
+                      handleChange("businessPhone", e.target.value)
+                    }
                     placeholder="(123) 456-7890"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="businessNIT">NIT</Label>
+                  <Input
+                    id="businessNIT"
+                    value={config.businessNIT}
+                    onChange={(e) =>
+                      handleChange("businessNIT", e.target.value)
+                    }
+                    placeholder="Ej: 123456789-0"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Número de identificación tributaria
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dailyBase">Base Diaria de Caja</Label>{" "}
+                  <InputNumber
+  id="dailyBase"
+  value={config.dailyBase}
+  onChange={(value) => handleChange("dailyBase", value)}
+  placeholder="500"
+/>
+                  <p className="text-xs text-muted-foreground">
+                    Cantidad de dinero con la que inicia la caja cada día
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -134,16 +176,16 @@ export default function ConfiguracionPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="topN">Número de productos en Top N</Label>
-                  <Input
-                    id="topN"
-                    type="number"
-                    min="1"
-                    max="50"
-                    value={config.topN}
-                    onChange={(e) => handleChange("topN", Math.max(1, Math.min(50, Number(e.target.value))))}
-                  />
+                  <InputNumber
+  id="topN"
+  value={config.topN}
+  onChange={(value) => handleChange("topN", Math.max(1, Math.min(50, value)))}
+  min={1}
+  max={50}
+/>
                   <p className="text-xs text-muted-foreground">
-                    Define cuántos productos mostrar en las listas de más/menos vendidos (1-50)
+                    Define cuántos productos mostrar en las listas de más/menos
+                    vendidos (1-50)
                   </p>
                 </div>
               </CardContent>
@@ -152,5 +194,5 @@ export default function ConfiguracionPage() {
         </ScrollArea>
       </main>
     </div>
-  )
+  );
 }

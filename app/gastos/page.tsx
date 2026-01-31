@@ -1,5 +1,6 @@
 "use client"
 
+import { InputNumber } from '@/components/ui/input-number'
 import { useState, useEffect } from "react"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { Button } from "@/components/ui/button"
@@ -337,13 +338,12 @@ export default function GastosPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="expenseAmount">Monto</Label>
-                  <Input
-                    id="expenseAmount"
-                    type="number"
-                    value={expenseForm.amount}
-                    onChange={(e) => setExpenseForm(prev => ({ ...prev, amount: Number(e.target.value) }))}
-                    step="0.01"
-                  />
+                  <InputNumber
+  id="expenseAmount"
+  value={expenseForm.amount}
+  onChange={(value) => setExpenseForm(prev => ({ ...prev, amount: value }))}
+  placeholder="0.00"
+/>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="expenseCategory">Categoria</Label>

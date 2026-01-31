@@ -1,5 +1,3 @@
-// Types for Restaurant POS System
-
 export interface Category {
   id: string
   name: string
@@ -82,8 +80,8 @@ export interface DailyClosure {
   totalExpenses: number
   employeePayments: EmployeePayment[]
   totalPayments: number
-  netIncome: number
   lowStockProducts: LowStockProduct[]
+  dailyBase: number
   createdAt: string
 }
 
@@ -101,6 +99,8 @@ export interface SystemConfig {
   businessName: string
   businessAddress: string
   businessPhone: string
+  businessNIT: string
+  dailyBase: number
 }
 
 export interface CartItem extends SaleItem {
@@ -113,7 +113,6 @@ export interface DailyStats {
   totalSales: number
   totalExpenses: number
   totalPayments: number
-  netIncome: number
 }
 
 export interface MonthlyStats {
@@ -121,7 +120,6 @@ export interface MonthlyStats {
   totalSales: number
   totalExpenses: number
   totalPayments: number
-  netIncome: number
 }
 
 export interface ProductStats {

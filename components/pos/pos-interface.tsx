@@ -1,5 +1,6 @@
 "use client";
 
+import { InputNumber } from "@/components/ui/input-number";
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -24,6 +25,7 @@ import {
   getTodaySales,
   cancelSale,
   initializeSampleData,
+  getConfig,
 } from "@/lib/database";
 import type { Category, Product, CartItem, Sale } from "@/lib/types";
 import {
@@ -242,55 +244,149 @@ export function POSInterface() {
   };
 
   const printTicket = (sale: Sale) => {
+    const config = getConfig();
+
     const printWindow = window.open("", "_blank", "width=300,height=600");
     if (printWindow) {
       printWindow.document.write(`
-        <html>
-          <head>
-            <title>Ticket de Venta</title>
-            <style>
-              body { font-family: monospace; font-size: 12px; width: 280px; margin: 0 auto; }
-              .header { text-align: center; margin-bottom: 10px; }
-              .line { border-top: 1px dashed #000; margin: 5px 0; }
-              .item { display: flex; justify-content: space-between; }
-              .total { font-weight: bold; font-size: 14px; }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h3>RESTAURANTE</h3>
-              <p>Ticket #${sale.id.slice(-6).toUpperCase()}</p>
-              <p>${new Date(sale.createdAt).toLocaleString("es-MX")}</p>
+      <html>
+        <head>
+          <title>Ticket de Venta</title>
+          <style>
+            body { 
+              font-family: monospace; 
+              font-size: 12px; 
+              width: 280px; 
+              margin: 0 auto;
+              padding: 5px;
+            }
+            .header { 
+              text-align: center; 
+              margin-bottom: 10px;
+              border-bottom: 1px dashed #000;
+              padding-bottom: 8px;
+            }
+            .business-name {
+              font-size: 14px;
+              font-weight: bold;
+              margin-bottom: 3px;
+            }
+            .business-info {
+              font-size: 10px;
+              margin-bottom: 3px;
+              color: #555;
+            }
+              .business-nit {
+          font-size: 10px;
+          margin-bottom: 3px;
+          color: #555;
+          font-weight: bold;
+        }
+            .iva-notice {
+              font-size: 9px;
+              color: #666;
+              font-style: italic;
+              margin: 5px 0;
+            }
+            .line { 
+              border-top: 1px dashed #000; 
+              margin: 5px 0; 
+            }
+            .item { 
+              display: flex; 
+              justify-content: space-between;
+              margin: 3px 0;
+            }
+            .item-name {
+              flex: 1;
+              margin-right: 10px;
+            }
+            .item-price {
+              text-align: right;
+              white-space: nowrap;
+            }
+            .total { 
+              font-weight: bold; 
+              font-size: 14px; 
+            }
+            .footer {
+              text-align: center;
+              margin-top: 15px;
+              font-size: 10px;
+              color: #666;
+              border-top: 1px dashed #000;
+              padding-top: 8px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="business-name">${config.businessName || "RESTAURANTE"}</div>
+            ${config.businessAddress ? `<div class="business-info">${config.businessAddress}</div>` : ""}
+            ${config.businessPhone ? `<div class="business-info">Tel: ${config.businessPhone}</div>` : ""}
+            ${config.businessNIT ? `<div class="business-nit">NIT: ${config.businessNIT}</div>` : ""}
+            <div class="business-info">
+              Ticket #${sale.id.slice(-6).toUpperCase()}
             </div>
-            <div class="line"></div>
-            ${sale.items
-              .map(
-                (item) => `
-              <div class="item">
-                <span>${item.quantity}x ${item.productName}</span>
-                <span>$${item.total.toFixed(2)}</span>
+            <div class="business-info">
+              ${new Date(sale.createdAt).toLocaleString("es-MX")}
+            </div>
+          </div>
+          
+          <div class="line"></div>
+          
+          ${sale.items
+            .map(
+              (item) => `
+            <div class="item">
+              <div class="item-name">
+                ${item.quantity}x ${item.productName}
               </div>
-            `,
-              )
-              .join("")}
-            <div class="line"></div>
-            <div class="item total">
-              <span>TOTAL:</span>
-              <span>$${sale.total.toFixed(2)}</span>
+              <div class="item-price">
+                $${item.total.toFixed(2)}
+              </div>
             </div>
+          `,
+            )
+            .join("")}
+          
+          <div class="line"></div>
+          
+          <div class="item total">
+            <span>TOTAL:</span>
+            <span>$${sale.total.toFixed(2)}</span>
+          </div>
+          
+          <div class="item">
+            <span>Efectivo:</span>
+            <span>$${sale.cashAmount.toFixed(2)}</span>
+          </div>
+          
+          <div class="item">
+            <span>Transferencia:</span>
+            <span>$${sale.transferAmount.toFixed(2)}</span>
+          </div>
+          
+          ${
+            sale.cashAmount > sale.total
+              ? `
             <div class="item">
-              <span>Efectivo:</span>
-              <span>$${sale.cashAmount.toFixed(2)}</span>
+              <span>Cambio:</span>
+              <span>$${(sale.cashAmount - sale.total).toFixed(2)}</span>
             </div>
-            <div class="item">
-              <span>Transferencia:</span>
-              <span>$${sale.transferAmount.toFixed(2)}</span>
-            </div>
-            <div class="line"></div>
-            <p style="text-align: center;">Gracias por su compra</p>
-          </body>
-        </html>
-      `);
+          `
+              : ""
+          }
+          
+          <div class="line"></div>
+          
+          <div class="footer">
+            Gracias por su compra<br>
+            ¡Vuelva pronto!
+          </div>
+        </body>
+      </html>
+    `);
       printWindow.document.close();
       printWindow.print();
     }
@@ -538,33 +634,30 @@ export function POSInterface() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="cashAmount">Efectivo</Label>
-                  <Input
-                    id="cashAmount"
-                    type="number"
+                  <InputNumber
+                    id="cashPaid"
                     value={payment.cashAmount}
-                    onChange={(e) => {
-                      const cash = Number(e.target.value) || 0;
+                    onChange={(value) => {
                       setPayment((prev) => ({
                         ...prev,
-                        cashAmount: cash,
-                        transferAmount: Math.max(0, cartTotal - cash),
+                        cashAmount: value,
+                        transferAmount: Math.max(0, cartTotal - value),
                       }));
                     }}
                     className="text-lg"
+                    placeholder="Ej: 500.00"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="transferAmount">Transferencia</Label>
-                  <Input
+                  <InputNumber
                     id="transferAmount"
-                    type="number"
                     value={payment.transferAmount}
-                    onChange={(e) => {
-                      const transfer = Number(e.target.value) || 0;
+                    onChange={(value) => {
                       setPayment((prev) => ({
                         ...prev,
-                        transferAmount: transfer,
-                        cashAmount: Math.max(0, cartTotal - transfer),
+                        transferAmount: value,
+                        cashAmount: Math.max(0, cartTotal - value),
                       }));
                     }}
                     className="text-lg"
@@ -580,19 +673,17 @@ export function POSInterface() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="cashPaid">Monto Recibido</Label>
-                  <Input
-                    id="cashPaid"
-                    type="number"
+                  <InputNumber
+                    id="cashAmount"
                     value={payment.cashAmount}
-                    onChange={(e) => {
-                      const cashPaid = Number(e.target.value) || 0;
+                    onChange={(value) => {
                       setPayment((prev) => ({
                         ...prev,
-                        cashAmount: cashPaid,
+                        cashAmount: value,
+                        transferAmount: Math.max(0, cartTotal - value),
                       }));
                     }}
                     className="text-lg"
-                    placeholder="Ej: 500.00"
                   />
                 </div>
 

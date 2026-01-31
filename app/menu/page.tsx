@@ -1,28 +1,29 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { AppSidebar } from "@/components/layout/app-sidebar"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { useState, useEffect } from "react";
+import { AppSidebar } from "@/components/layout/app-sidebar";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { InputNumber } from "@/components/ui/input-number";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,9 +33,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useToast } from "@/hooks/use-toast"
+} from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
 import {
   getCategories,
   saveCategory,
@@ -45,8 +46,8 @@ import {
   updateProduct,
   deleteProduct,
   initializeSampleData,
-} from "@/lib/database"
-import type { Category, Product } from "@/lib/types"
+} from "@/lib/database";
+import type { Category, Product } from "@/lib/types";
 import {
   Plus,
   Pencil,
@@ -54,7 +55,7 @@ import {
   Package,
   FolderOpen,
   AlertTriangle,
-} from "lucide-react"
+} from "lucide-react";
 
 const CATEGORY_COLORS = [
   "#0ea5e9",
@@ -65,26 +66,31 @@ const CATEGORY_COLORS = [
   "#14b8a6",
   "#f59e0b",
   "#6366f1",
-]
+];
 
 export default function MenuPage() {
-  const [categories, setCategories] = useState<Category[]>([])
-  const [products, setProducts] = useState<Product[]>([])
-  const [selectedCategory, setSelectedCategory] = useState<string | "all">("all")
-  const [showCategoryDialog, setShowCategoryDialog] = useState(false)
-  const [showProductDialog, setShowProductDialog] = useState(false)
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null)
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<{ type: "category" | "product"; id: string } | null>(null)
-  const { toast } = useToast()
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | "all">(
+    "all",
+  );
+  const [showCategoryDialog, setShowCategoryDialog] = useState(false);
+  const [showProductDialog, setShowProductDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    type: "category" | "product";
+    id: string;
+  } | null>(null);
+  const { toast } = useToast();
 
   // Form states
   const [categoryForm, setCategoryForm] = useState({
     name: "",
     color: CATEGORY_COLORS[0],
     order: 1,
-  })
+  });
   const [productForm, setProductForm] = useState({
     name: "",
     price: 0,
@@ -92,41 +98,42 @@ export default function MenuPage() {
     stock: 0,
     minStock: 0,
     hasInventoryControl: false,
-  })
+  });
 
   useEffect(() => {
-    initializeSampleData()
-    loadData()
-  }, [])
+    initializeSampleData();
+    loadData();
+  }, []);
 
   const loadData = () => {
-    setCategories(getCategories().sort((a, b) => a.order - b.order))
-    setProducts(getProducts().filter(p => p.isActive))
-  }
+    setCategories(getCategories().sort((a, b) => a.order - b.order));
+    setProducts(getProducts().filter((p) => p.isActive));
+  };
 
-  const filteredProducts = selectedCategory === "all"
-    ? products
-    : products.filter(p => p.categoryId === selectedCategory)
+  const filteredProducts =
+    selectedCategory === "all"
+      ? products
+      : products.filter((p) => p.categoryId === selectedCategory);
 
   // Category handlers
   const openCategoryDialog = (category?: Category) => {
     if (category) {
-      setEditingCategory(category)
+      setEditingCategory(category);
       setCategoryForm({
         name: category.name,
         color: category.color,
         order: category.order,
-      })
+      });
     } else {
-      setEditingCategory(null)
+      setEditingCategory(null);
       setCategoryForm({
         name: "",
         color: CATEGORY_COLORS[categories.length % CATEGORY_COLORS.length],
         order: categories.length + 1,
-      })
+      });
     }
-    setShowCategoryDialog(true)
-  }
+    setShowCategoryDialog(true);
+  };
 
   const handleSaveCategory = () => {
     if (!categoryForm.name.trim()) {
@@ -134,26 +141,26 @@ export default function MenuPage() {
         title: "Error",
         description: "El nombre de la categoria es requerido",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
     if (editingCategory) {
-      updateCategory(editingCategory.id, categoryForm)
-      toast({ title: "Categoria actualizada" })
+      updateCategory(editingCategory.id, categoryForm);
+      toast({ title: "Categoria actualizada" });
     } else {
-      saveCategory(categoryForm)
-      toast({ title: "Categoria creada" })
+      saveCategory(categoryForm);
+      toast({ title: "Categoria creada" });
     }
 
-    setShowCategoryDialog(false)
-    loadData()
-  }
+    setShowCategoryDialog(false);
+    loadData();
+  };
 
   // Product handlers
   const openProductDialog = (product?: Product) => {
     if (product) {
-      setEditingProduct(product)
+      setEditingProduct(product);
       setProductForm({
         name: product.name,
         price: product.price,
@@ -161,9 +168,9 @@ export default function MenuPage() {
         stock: product.stock,
         minStock: product.minStock,
         hasInventoryControl: product.hasInventoryControl,
-      })
+      });
     } else {
-      setEditingProduct(null)
+      setEditingProduct(null);
       setProductForm({
         name: "",
         price: 0,
@@ -171,10 +178,10 @@ export default function MenuPage() {
         stock: 0,
         minStock: 0,
         hasInventoryControl: false,
-      })
+      });
     }
-    setShowProductDialog(true)
-  }
+    setShowProductDialog(true);
+  };
 
   const handleSaveProduct = () => {
     if (!productForm.name.trim()) {
@@ -182,8 +189,8 @@ export default function MenuPage() {
         title: "Error",
         description: "El nombre del producto es requerido",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
     if (productForm.price <= 0) {
@@ -191,8 +198,8 @@ export default function MenuPage() {
         title: "Error",
         description: "El precio debe ser mayor a 0",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
     if (!productForm.categoryId) {
@@ -200,60 +207,63 @@ export default function MenuPage() {
         title: "Error",
         description: "Selecciona una categoria",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
     if (editingProduct) {
-      updateProduct(editingProduct.id, productForm)
-      toast({ title: "Producto actualizado" })
+      updateProduct(editingProduct.id, productForm);
+      toast({ title: "Producto actualizado" });
     } else {
-      saveProduct({ ...productForm, isActive: true })
-      toast({ title: "Producto creado" })
+      saveProduct({ ...productForm, isActive: true });
+      toast({ title: "Producto creado" });
     }
 
-    setShowProductDialog(false)
-    loadData()
-  }
+    setShowProductDialog(false);
+    loadData();
+  };
 
   // Delete handlers
   const openDeleteDialog = (type: "category" | "product", id: string) => {
-    setDeleteTarget({ type, id })
-    setShowDeleteDialog(true)
-  }
+    setDeleteTarget({ type, id });
+    setShowDeleteDialog(true);
+  };
 
   const handleDelete = () => {
-    if (!deleteTarget) return
+    if (!deleteTarget) return;
 
     if (deleteTarget.type === "category") {
-      const categoryProducts = products.filter(p => p.categoryId === deleteTarget.id)
+      const categoryProducts = products.filter(
+        (p) => p.categoryId === deleteTarget.id,
+      );
       if (categoryProducts.length > 0) {
         toast({
           title: "Error",
-          description: "No puedes eliminar una categoria con productos. Elimina o mueve los productos primero.",
+          description:
+            "No puedes eliminar una categoria con productos. Elimina o mueve los productos primero.",
           variant: "destructive",
-        })
-        setShowDeleteDialog(false)
-        return
+        });
+        setShowDeleteDialog(false);
+        return;
       }
-      deleteCategory(deleteTarget.id)
-      toast({ title: "Categoria eliminada" })
+      deleteCategory(deleteTarget.id);
+      toast({ title: "Categoria eliminada" });
     } else {
-      deleteProduct(deleteTarget.id)
-      toast({ title: "Producto eliminado" })
+      deleteProduct(deleteTarget.id);
+      toast({ title: "Producto eliminado" });
     }
 
-    setShowDeleteDialog(false)
-    loadData()
-  }
+    setShowDeleteDialog(false);
+    loadData();
+  };
 
   const getCategoryName = (categoryId: string) => {
-    return categories.find(c => c.id === categoryId)?.name || "Sin categoria"
-  }
+    return categories.find((c) => c.id === categoryId)?.name || "Sin categoria";
+  };
 
   const getCategoryColor = (categoryId: string) => {
-    return categories.find(c => c.id === categoryId)?.color || "#6b7280"
-  }
+    return categories.find((c) => c.id === categoryId)?.color || "#6b7280";
+  };
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -262,7 +272,9 @@ export default function MenuPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold">Gestion del Menu</h1>
-            <p className="text-muted-foreground">Administra categorias y productos</p>
+            <p className="text-muted-foreground">
+              Administra categorias y productos
+            </p>
           </div>
         </div>
 
@@ -288,14 +300,17 @@ export default function MenuPage() {
                 >
                   Todos
                 </Button>
-                {categories.map(cat => (
+                {categories.map((cat) => (
                   <Button
                     key={cat.id}
-                    variant={selectedCategory === cat.id ? "default" : "outline"}
+                    variant={
+                      selectedCategory === cat.id ? "default" : "outline"
+                    }
                     size="sm"
                     onClick={() => setSelectedCategory(cat.id)}
                     style={{
-                      backgroundColor: selectedCategory === cat.id ? cat.color : undefined,
+                      backgroundColor:
+                        selectedCategory === cat.id ? cat.color : undefined,
                       borderColor: cat.color,
                       color: selectedCategory === cat.id ? "#fff" : cat.color,
                     }}
@@ -312,7 +327,7 @@ export default function MenuPage() {
 
             <ScrollArea className="flex-1">
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 pr-4">
-                {filteredProducts.map(product => (
+                {filteredProducts.map((product) => (
                   <Card key={product.id} className="relative">
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between">
@@ -338,8 +353,14 @@ export default function MenuPage() {
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           {product.hasInventoryControl ? (
                             <div className="flex items-center gap-1">
-                              Stock: 
-                              <span className={product.stock <= product.minStock ? "text-destructive font-medium" : ""}>
+                              Stock:
+                              <span
+                                className={
+                                  product.stock <= product.minStock
+                                    ? "text-destructive font-medium"
+                                    : ""
+                                }
+                              >
                                 {product.stock}
                               </span>
                               {product.stock <= product.minStock && (
@@ -363,7 +384,9 @@ export default function MenuPage() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => openDeleteDialog("product", product.id)}
+                            onClick={() =>
+                              openDeleteDialog("product", product.id)
+                            }
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -386,8 +409,10 @@ export default function MenuPage() {
 
             <ScrollArea className="flex-1">
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 pr-4">
-                {categories.map(category => {
-                  const productCount = products.filter(p => p.categoryId === category.id).length
+                {categories.map((category) => {
+                  const productCount = products.filter(
+                    (p) => p.categoryId === category.id,
+                  ).length;
                   return (
                     <Card key={category.id}>
                       <CardHeader className="pb-3">
@@ -400,9 +425,12 @@ export default function MenuPage() {
                               <FolderOpen className="h-5 w-5 text-white" />
                             </div>
                             <div>
-                              <CardTitle className="text-lg">{category.name}</CardTitle>
+                              <CardTitle className="text-lg">
+                                {category.name}
+                              </CardTitle>
                               <p className="text-sm text-muted-foreground">
-                                {productCount} producto{productCount !== 1 ? "s" : ""}
+                                {productCount} producto
+                                {productCount !== 1 ? "s" : ""}
                               </p>
                             </div>
                           </div>
@@ -419,7 +447,9 @@ export default function MenuPage() {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => openDeleteDialog("category", category.id)}
+                              onClick={() =>
+                                openDeleteDialog("category", category.id)
+                              }
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -427,7 +457,7 @@ export default function MenuPage() {
                         </div>
                       </CardHeader>
                     </Card>
-                  )
+                  );
                 })}
               </div>
             </ScrollArea>
@@ -448,22 +478,31 @@ export default function MenuPage() {
                 <Input
                   id="categoryName"
                   value={categoryForm.name}
-                  onChange={(e) => setCategoryForm(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) =>
+                    setCategoryForm((prev) => ({
+                      ...prev,
+                      name: e.target.value,
+                    }))
+                  }
                   placeholder="Ej: Pescados"
                 />
               </div>
               <div className="space-y-2">
                 <Label>Color</Label>
                 <div className="flex gap-2 flex-wrap">
-                  {CATEGORY_COLORS.map(color => (
+                  {CATEGORY_COLORS.map((color) => (
                     <button
                       key={color}
                       type="button"
                       className={`h-10 w-10 rounded-lg transition-transform ${
-                        categoryForm.color === color ? "ring-2 ring-offset-2 ring-primary scale-110" : ""
+                        categoryForm.color === color
+                          ? "ring-2 ring-offset-2 ring-primary scale-110"
+                          : ""
                       }`}
                       style={{ backgroundColor: color }}
-                      onClick={() => setCategoryForm(prev => ({ ...prev, color }))}
+                      onClick={() =>
+                        setCategoryForm((prev) => ({ ...prev, color }))
+                      }
                     />
                   ))}
                 </div>
@@ -474,12 +513,20 @@ export default function MenuPage() {
                   id="categoryOrder"
                   type="number"
                   value={categoryForm.order}
-                  onChange={(e) => setCategoryForm(prev => ({ ...prev, order: Number(e.target.value) }))}
+                  onChange={(e) =>
+                    setCategoryForm((prev) => ({
+                      ...prev,
+                      order: Number(e.target.value),
+                    }))
+                  }
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCategoryDialog(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setShowCategoryDialog(false)}
+              >
                 Cancelar
               </Button>
               <Button onClick={handleSaveCategory}>
@@ -503,32 +550,40 @@ export default function MenuPage() {
                 <Input
                   id="productName"
                   value={productForm.name}
-                  onChange={(e) => setProductForm(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) =>
+                    setProductForm((prev) => ({
+                      ...prev,
+                      name: e.target.value,
+                    }))
+                  }
                   placeholder="Ej: Filete de Pescado"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="productPrice">Precio</Label>
-                  <Input
+                  <InputNumber
                     id="productPrice"
-                    type="number"
                     value={productForm.price}
-                    onChange={(e) => setProductForm(prev => ({ ...prev, price: Number(e.target.value) }))}
-                    step="0.01"
+                    onChange={(value) =>
+                      setProductForm((prev) => ({ ...prev, price: value }))
+                    }
+                    placeholder="0.00"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="productCategory">Categoria</Label>
                   <Select
                     value={productForm.categoryId}
-                    onValueChange={(value) => setProductForm(prev => ({ ...prev, categoryId: value }))}
+                    onValueChange={(value) =>
+                      setProductForm((prev) => ({ ...prev, categoryId: value }))
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map(cat => (
+                      {categories.map((cat) => (
                         <SelectItem key={cat.id} value={cat.id}>
                           {cat.name}
                         </SelectItem>
@@ -546,8 +601,11 @@ export default function MenuPage() {
                 </div>
                 <Switch
                   checked={productForm.hasInventoryControl}
-                  onCheckedChange={(checked) => 
-                    setProductForm(prev => ({ ...prev, hasInventoryControl: checked }))
+                  onCheckedChange={(checked) =>
+                    setProductForm((prev) => ({
+                      ...prev,
+                      hasInventoryControl: checked,
+                    }))
                   }
                 />
               </div>
@@ -555,27 +613,34 @@ export default function MenuPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="productStock">Stock Actual</Label>
-                    <Input
+                    <InputNumber
                       id="productStock"
-                      type="number"
                       value={productForm.stock}
-                      onChange={(e) => setProductForm(prev => ({ ...prev, stock: Number(e.target.value) }))}
+                      onChange={(value) =>
+                        setProductForm((prev) => ({ ...prev, stock: value }))
+                      }
+                      min={0}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="productMinStock">Stock Minimo</Label>
-                    <Input
+                    <InputNumber
                       id="productMinStock"
-                      type="number"
                       value={productForm.minStock}
-                      onChange={(e) => setProductForm(prev => ({ ...prev, minStock: Number(e.target.value) }))}
+                      onChange={(value) =>
+                        setProductForm((prev) => ({ ...prev, minStock: value }))
+                      }
+                      min={0}
                     />
                   </div>
                 </div>
               )}
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowProductDialog(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setShowProductDialog(false)}
+              >
                 Cancelar
               </Button>
               <Button onClick={handleSaveProduct}>
@@ -598,7 +663,10 @@ export default function MenuPage() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              <AlertDialogAction
+                onClick={handleDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
                 Eliminar
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -606,5 +674,5 @@ export default function MenuPage() {
         </AlertDialog>
       </main>
     </div>
-  )
+  );
 }

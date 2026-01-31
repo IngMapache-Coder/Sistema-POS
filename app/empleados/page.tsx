@@ -1,5 +1,6 @@
 "use client"
 
+import { InputNumber } from '@/components/ui/input-number'
 import { useState, useEffect } from "react"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { Button } from "@/components/ui/button"
@@ -393,13 +394,12 @@ export default function EmpleadosPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="employeePay">Pago Diario Base</Label>
-                <Input
-                  id="employeePay"
-                  type="number"
-                  value={employeeForm.dailyPayBase}
-                  onChange={(e) => setEmployeeForm(prev => ({ ...prev, dailyPayBase: Number(e.target.value) }))}
-                  step="10"
-                />
+                <InputNumber
+  id="employeePay"
+  value={employeeForm.dailyPayBase}
+  onChange={(value) => setEmployeeForm(prev => ({ ...prev, dailyPayBase: value }))}
+  placeholder="300"
+/>
                 <p className="text-xs text-muted-foreground">
                   Este es el monto base que se pagara diariamente. Se puede ajustar al momento del pago.
                 </p>
@@ -440,14 +440,13 @@ export default function EmpleadosPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="paymentAmount">Monto a Pagar</Label>
-                  <Input
-                    id="paymentAmount"
-                    type="number"
-                    value={paymentForm.amount}
-                    onChange={(e) => setPaymentForm(prev => ({ ...prev, amount: Number(e.target.value) }))}
-                    step="10"
-                    className="text-lg"
-                  />
+                  <InputNumber
+  id="paymentAmount"
+  value={paymentForm.amount}
+  onChange={(value) => setPaymentForm(prev => ({ ...prev, amount: value }))}
+  className="text-lg"
+  placeholder="0.00"
+/>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Pago base: ${payingEmployee.dailyPayBase.toFixed(2)}</span>
                     {paymentForm.amount !== payingEmployee.dailyPayBase && (
