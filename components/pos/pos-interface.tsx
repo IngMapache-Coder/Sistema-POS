@@ -1,21 +1,21 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useCallback } from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { useState, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { useToast } from "@/hooks/use-toast"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useToast } from "@/hooks/use-toast";
 import {
   getCategories,
   getProductsByCategory,
@@ -24,8 +24,8 @@ import {
   getTodaySales,
   cancelSale,
   initializeSampleData,
-} from "@/lib/database"
-import type { Category, Product, CartItem, Sale } from "@/lib/types"
+} from "@/lib/database";
+import type { Category, Product, CartItem, Sale } from "@/lib/types";
 import {
   Minus,
   Plus,
@@ -36,65 +36,65 @@ import {
   X,
   Printer,
   Ban,
-} from "lucide-react"
+} from "lucide-react";
 
 interface PaymentState {
-  method: "cash" | "transfer" | "mixed"
-  cashAmount: number
-  transferAmount: number
+  method: "cash" | "transfer" | "mixed";
+  cashAmount: number;
+  transferAmount: number;
 }
 
 export function POSInterface() {
-  const [categories, setCategories] = useState<Category[]>([])
-  const [products, setProducts] = useState<Product[]>([])
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [cart, setCart] = useState<CartItem[]>([])
-  const [showPaymentDialog, setShowPaymentDialog] = useState(false)
-  const [showSalesDialog, setShowSalesDialog] = useState(false)
-  const [todaySales, setTodaySales] = useState<Sale[]>([])
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showSalesDialog, setShowSalesDialog] = useState(false);
+  const [todaySales, setTodaySales] = useState<Sale[]>([]);
+  const cartTotal = cart.reduce((sum, item) => sum + item.total, 0);
   const [payment, setPayment] = useState<PaymentState>({
     method: "cash",
-    cashAmount: 0,
+    cashAmount: cartTotal,
     transferAmount: 0,
-  })
-  const { toast } = useToast()
+  });
+  const [productsTimestamp, setProductsTimestamp] = useState(Date.now());
+  const { toast } = useToast();
 
   const loadData = useCallback(() => {
-    initializeSampleData()
-    const cats = getCategories()
-    setCategories(cats.sort((a, b) => a.order - b.order))
+    initializeSampleData();
+    const cats = getCategories();
+    setCategories(cats.sort((a, b) => a.order - b.order));
     if (cats.length > 0 && !selectedCategory) {
-      setSelectedCategory(cats[0].id)
+      setSelectedCategory(cats[0].id);
     }
-  }, [selectedCategory])
+  }, [selectedCategory]);
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    loadData();
+  }, [loadData]);
 
   useEffect(() => {
     if (selectedCategory) {
-      setProducts(getProductsByCategory(selectedCategory))
+      setProducts(getProductsByCategory(selectedCategory));
     } else {
-      setProducts(getProducts().filter(p => p.isActive))
+      setProducts(getProducts().filter((p) => p.isActive));
     }
-  }, [selectedCategory])
-
-  const cartTotal = cart.reduce((sum, item) => sum + item.total, 0)
+  }, [selectedCategory, productsTimestamp]);
 
   const addToCart = (product: Product) => {
-    setCart(prevCart => {
-      const existing = prevCart.find(item => item.productId === product.id)
+    setCart((prevCart) => {
+      const existing = prevCart.find((item) => item.productId === product.id);
       if (existing) {
-        return prevCart.map(item =>
+        return prevCart.map((item) =>
           item.productId === product.id
             ? {
                 ...item,
                 quantity: item.quantity + 1,
                 total: (item.quantity + 1) * item.unitPrice,
               }
-            : item
-        )
+            : item,
+        );
       }
       return [
         ...prevCart,
@@ -105,36 +105,38 @@ export function POSInterface() {
           unitPrice: product.price,
           total: product.price,
         },
-      ]
-    })
-  }
+      ];
+    });
+  };
 
   const updateQuantity = (productId: string, delta: number) => {
-    setCart(prevCart => {
+    setCart((prevCart) => {
       return prevCart
-        .map(item => {
+        .map((item) => {
           if (item.productId === productId) {
-            const newQty = item.quantity + delta
-            if (newQty <= 0) return null
+            const newQty = item.quantity + delta;
+            if (newQty <= 0) return null;
             return {
               ...item,
               quantity: newQty,
               total: newQty * item.unitPrice,
-            }
+            };
           }
-          return item
+          return item;
         })
-        .filter(Boolean) as CartItem[]
-    })
-  }
+        .filter(Boolean) as CartItem[];
+    });
+  };
 
   const removeFromCart = (productId: string) => {
-    setCart(prevCart => prevCart.filter(item => item.productId !== productId))
-  }
+    setCart((prevCart) =>
+      prevCart.filter((item) => item.productId !== productId),
+    );
+  };
 
   const clearCart = () => {
-    setCart([])
-  }
+    setCart([]);
+  };
 
   const openPaymentDialog = () => {
     if (cart.length === 0) {
@@ -142,75 +144,105 @@ export function POSInterface() {
         title: "Carrito vacio",
         description: "Agrega productos al carrito antes de cobrar",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
     setPayment({
       method: "cash",
       cashAmount: cartTotal,
       transferAmount: 0,
-    })
-    setShowPaymentDialog(true)
-  }
+    });
+    setShowPaymentDialog(true);
+  };
 
   const handlePaymentMethodChange = (method: "cash" | "transfer" | "mixed") => {
-    setPayment(prev => ({
+    setPayment((prev) => ({
       ...prev,
       method,
-      cashAmount: method === "transfer" ? 0 : method === "cash" ? cartTotal : prev.cashAmount,
-      transferAmount: method === "cash" ? 0 : method === "transfer" ? cartTotal : prev.transferAmount,
-    }))
-  }
+      cashAmount:
+        method === "transfer"
+          ? 0
+          : method === "cash"
+            ? cartTotal
+            : prev.cashAmount,
+      transferAmount:
+        method === "cash"
+          ? 0
+          : method === "transfer"
+            ? cartTotal
+            : prev.transferAmount,
+    }));
+  };
 
   const handleCompleteSale = () => {
     if (payment.method === "mixed") {
-      const total = payment.cashAmount + payment.transferAmount
+      const total = payment.cashAmount + payment.transferAmount;
       if (Math.abs(total - cartTotal) > 0.01) {
         toast({
           title: "Error en el pago",
           description: `El total del pago ($${total.toFixed(2)}) no coincide con el total de la venta ($${cartTotal.toFixed(2)})`,
           variant: "destructive",
-        })
-        return
+        });
+        return;
       }
+    }
+
+    if (payment.method === "cash" && payment.cashAmount < cartTotal) {
+      toast({
+        title: "Monto insuficiente",
+        description: `El monto recibido ($${payment.cashAmount.toFixed(2)}) es menor al total ($${cartTotal.toFixed(2)})`,
+        variant: "destructive",
+      });
+      return;
     }
 
     const sale = saveSale({
       items: cart,
       subtotal: cartTotal,
       total: cartTotal,
-      cashAmount: payment.method === "transfer" ? 0 : payment.method === "cash" ? cartTotal : payment.cashAmount,
-      transferAmount: payment.method === "cash" ? 0 : payment.method === "transfer" ? cartTotal : payment.transferAmount,
+      cashAmount:
+        payment.method === "transfer"
+          ? 0
+          : payment.method === "cash"
+            ? cartTotal
+            : payment.cashAmount,
+      transferAmount:
+        payment.method === "cash"
+          ? 0
+          : payment.method === "transfer"
+            ? cartTotal
+            : payment.transferAmount,
       paymentMethod: payment.method,
-    })
+    });
 
     toast({
       title: "Venta completada",
       description: `Venta #${sale.id.slice(-6).toUpperCase()} por $${cartTotal.toFixed(2)}`,
-    })
+    });
 
-    clearCart()
-    setShowPaymentDialog(false)
-  }
+    clearCart();
+    setShowPaymentDialog(false);
+    setProductsTimestamp(Date.now());
+  };
 
   const openSalesDialog = () => {
-    setTodaySales(getTodaySales())
-    setShowSalesDialog(true)
-  }
+    setTodaySales(getTodaySales());
+    setShowSalesDialog(true);
+  };
 
   const handleCancelSale = (saleId: string) => {
-    const result = cancelSale(saleId, "admin")
+    const result = cancelSale(saleId, "admin");
     if (result) {
       toast({
         title: "Venta anulada",
         description: `La venta #${saleId.slice(-6).toUpperCase()} ha sido anulada`,
-      })
-      setTodaySales(getTodaySales())
+      });
+      setTodaySales(getTodaySales());
     }
-  }
+  };
 
   const printTicket = (sale: Sale) => {
-    const printWindow = window.open("", "_blank", "width=300,height=600")
+    const printWindow = window.open("", "_blank", "width=300,height=600");
     if (printWindow) {
       printWindow.document.write(`
         <html>
@@ -231,12 +263,16 @@ export function POSInterface() {
               <p>${new Date(sale.createdAt).toLocaleString("es-MX")}</p>
             </div>
             <div class="line"></div>
-            ${sale.items.map(item => `
+            ${sale.items
+              .map(
+                (item) => `
               <div class="item">
                 <span>${item.quantity}x ${item.productName}</span>
                 <span>$${item.total.toFixed(2)}</span>
               </div>
-            `).join("")}
+            `,
+              )
+              .join("")}
             <div class="line"></div>
             <div class="item total">
               <span>TOTAL:</span>
@@ -254,11 +290,11 @@ export function POSInterface() {
             <p style="text-align: center;">Gracias por su compra</p>
           </body>
         </html>
-      `)
-      printWindow.document.close()
-      printWindow.print()
+      `);
+      printWindow.document.close();
+      printWindow.print();
     }
-  }
+  };
 
   return (
     <div className="flex h-full gap-4">
@@ -266,15 +302,17 @@ export function POSInterface() {
       <div className="flex-1 flex flex-col gap-4">
         {/* Categories */}
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-          {categories.map(category => (
+          {categories.map((category) => (
             <Button
               key={category.id}
               variant={selectedCategory === category.id ? "default" : "outline"}
               className="pos-button px-6 py-3 text-base whitespace-nowrap"
               style={{
-                backgroundColor: selectedCategory === category.id ? category.color : undefined,
+                backgroundColor:
+                  selectedCategory === category.id ? category.color : undefined,
                 borderColor: category.color,
-                color: selectedCategory === category.id ? "#fff" : category.color,
+                color:
+                  selectedCategory === category.id ? "#fff" : category.color,
               }}
               onClick={() => setSelectedCategory(category.id)}
             >
@@ -286,8 +324,8 @@ export function POSInterface() {
         {/* Products Grid */}
         <ScrollArea className="flex-1">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pr-4">
-            {products.map(product => (
-                <Card
+            {products.map((product) => (
+              <Card
                 key={product.id}
                 className="p-4 cursor-pointer hover:bg-accent/50 active:scale-95 transition-all min-h-12"
                 onClick={() => addToCart(product)}
@@ -302,7 +340,11 @@ export function POSInterface() {
                     </span>
                     {product.hasInventoryControl && (
                       <Badge
-                        variant={product.stock <= product.minStock ? "destructive" : "secondary"}
+                        variant={
+                          product.stock <= product.minStock
+                            ? "destructive"
+                            : "secondary"
+                        }
                         className="text-xs"
                       >
                         {product.stock}
@@ -341,13 +383,15 @@ export function POSInterface() {
             </div>
           ) : (
             <div className="space-y-3">
-              {cart.map(item => (
+              {cart.map((item) => (
                 <div
                   key={item.productId}
                   className="flex items-center gap-3 p-2 rounded-lg bg-secondary/50"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{item.productName}</p>
+                    <p className="font-medium text-sm truncate">
+                      {item.productName}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       ${item.unitPrice.toFixed(2)} c/u
                     </p>
@@ -361,7 +405,9 @@ export function POSInterface() {
                     >
                       <Minus className="h-4 w-4" />
                     </Button>
-                    <span className="w-8 text-center font-medium">{item.quantity}</span>
+                    <span className="w-8 text-center font-medium">
+                      {item.quantity}
+                    </span>
                     <Button
                       variant="outline"
                       size="icon"
@@ -426,18 +472,26 @@ export function POSInterface() {
           <div className="space-y-6 py-4">
             <div className="text-center">
               <p className="text-sm text-muted-foreground">Total a cobrar</p>
-              <p className="text-4xl font-bold text-primary">${cartTotal.toFixed(2)}</p>
+              <p className="text-4xl font-bold text-primary">
+                ${cartTotal.toFixed(2)}
+              </p>
             </div>
 
             <div className="space-y-3">
               <Label>Metodo de pago</Label>
               <RadioGroup
                 value={payment.method}
-                onValueChange={(v) => handlePaymentMethodChange(v as "cash" | "transfer" | "mixed")}
+                onValueChange={(v) =>
+                  handlePaymentMethodChange(v as "cash" | "transfer" | "mixed")
+                }
                 className="grid grid-cols-3 gap-2"
               >
                 <div>
-                  <RadioGroupItem value="cash" id="cash" className="peer sr-only" />
+                  <RadioGroupItem
+                    value="cash"
+                    id="cash"
+                    className="peer sr-only"
+                  />
                   <Label
                     htmlFor="cash"
                     className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
@@ -447,7 +501,11 @@ export function POSInterface() {
                   </Label>
                 </div>
                 <div>
-                  <RadioGroupItem value="transfer" id="transfer" className="peer sr-only" />
+                  <RadioGroupItem
+                    value="transfer"
+                    id="transfer"
+                    className="peer sr-only"
+                  />
                   <Label
                     htmlFor="transfer"
                     className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
@@ -457,7 +515,11 @@ export function POSInterface() {
                   </Label>
                 </div>
                 <div>
-                  <RadioGroupItem value="mixed" id="mixed" className="peer sr-only" />
+                  <RadioGroupItem
+                    value="mixed"
+                    id="mixed"
+                    className="peer sr-only"
+                  />
                   <Label
                     htmlFor="mixed"
                     className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
@@ -481,12 +543,12 @@ export function POSInterface() {
                     type="number"
                     value={payment.cashAmount}
                     onChange={(e) => {
-                      const cash = Number(e.target.value) || 0
-                      setPayment(prev => ({
+                      const cash = Number(e.target.value) || 0;
+                      setPayment((prev) => ({
                         ...prev,
                         cashAmount: cash,
                         transferAmount: Math.max(0, cartTotal - cash),
-                      }))
+                      }));
                     }}
                     className="text-lg"
                   />
@@ -498,25 +560,96 @@ export function POSInterface() {
                     type="number"
                     value={payment.transferAmount}
                     onChange={(e) => {
-                      const transfer = Number(e.target.value) || 0
-                      setPayment(prev => ({
+                      const transfer = Number(e.target.value) || 0;
+                      setPayment((prev) => ({
                         ...prev,
                         transferAmount: transfer,
                         cashAmount: Math.max(0, cartTotal - transfer),
-                      }))
+                      }));
                     }}
                     className="text-lg"
                   />
                 </div>
                 <div className="text-sm text-muted-foreground text-center">
-                  Suma: ${(payment.cashAmount + payment.transferAmount).toFixed(2)}
+                  Suma: $
+                  {(payment.cashAmount + payment.transferAmount).toFixed(2)}
                 </div>
+              </div>
+            )}
+            {payment.method === "cash" && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="cashPaid">Monto Recibido</Label>
+                  <Input
+                    id="cashPaid"
+                    type="number"
+                    value={payment.cashAmount}
+                    onChange={(e) => {
+                      const cashPaid = Number(e.target.value) || 0;
+                      setPayment((prev) => ({
+                        ...prev,
+                        cashAmount: cashPaid,
+                      }));
+                    }}
+                    className="text-lg"
+                    placeholder="Ej: 500.00"
+                  />
+                </div>
+
+                {payment.cashAmount > 0 && payment.cashAmount !== cartTotal && (
+                  <div
+                    className={`rounded-lg p-4 text-center ${
+                      payment.cashAmount >= cartTotal
+                        ? "bg-success/10 border border-success/20"
+                        : "bg-destructive/10 border border-destructive/20"
+                    }`}
+                  >
+                    <p className="text-sm text-muted-foreground">
+                      Cambio a devolver:
+                    </p>
+                    <p
+                      className={`text-2xl font-bold ${
+                        payment.cashAmount >= cartTotal
+                          ? "text-success"
+                          : "text-destructive"
+                      }`}
+                    >
+                      {payment.cashAmount >= cartTotal
+                        ? `$${(payment.cashAmount - cartTotal).toFixed(2)}`
+                        : `Faltan $${(cartTotal - payment.cashAmount).toFixed(2)}`}
+                    </p>
+                    {payment.cashAmount < cartTotal && (
+                      <p className="text-xs text-destructive mt-1">
+                        El monto recibido es menor al total
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {payment.cashAmount === cartTotal && (
+                  <div className="rounded-lg bg-secondary/30 p-4 text-center">
+                    <p className="text-sm text-muted-foreground">Pago exacto</p>
+                    <p className="text-lg font-semibold">Sin cambio</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {payment.method === "transfer" && (
+              <div className="rounded-lg bg-primary/10 p-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Pago por transferencia
+                </p>
+                <p className="text-lg font-semibold">No requiere cambio</p>
               </div>
             )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowPaymentDialog(false)}
+            >
               Cancelar
             </Button>
             <Button
@@ -543,7 +676,7 @@ export function POSInterface() {
               </div>
             ) : (
               <div className="space-y-3">
-                {todaySales.map(sale => (
+                {todaySales.map((sale) => (
                   <Card key={sale.id} className="p-4">
                     <div className="flex items-start justify-between">
                       <div>
@@ -551,15 +684,23 @@ export function POSInterface() {
                           <span className="font-mono font-medium">
                             #{sale.id.slice(-6).toUpperCase()}
                           </span>
-                          <Badge variant={sale.status === "completed" ? "default" : "destructive"}>
-                            {sale.status === "completed" ? "Completada" : "Anulada"}
+                          <Badge
+                            variant={
+                              sale.status === "completed"
+                                ? "default"
+                                : "destructive"
+                            }
+                          >
+                            {sale.status === "completed"
+                              ? "Completada"
+                              : "Anulada"}
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
                           {new Date(sale.createdAt).toLocaleTimeString("es-MX")}
                         </p>
                         <div className="mt-2 text-sm">
-                          {sale.items.map(item => (
+                          {sale.items.map((item) => (
                             <p key={item.productId}>
                               {item.quantity}x {item.productName}
                             </p>
@@ -567,13 +708,15 @@ export function POSInterface() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xl font-bold">${sale.total.toFixed(2)}</p>
+                        <p className="text-xl font-bold">
+                          ${sale.total.toFixed(2)}
+                        </p>
                         <p className="text-xs text-muted-foreground">
                           {sale.paymentMethod === "cash"
                             ? "Efectivo"
                             : sale.paymentMethod === "transfer"
-                            ? "Transferencia"
-                            : "Mixto"}
+                              ? "Transferencia"
+                              : "Mixto"}
                         </p>
                         {sale.status === "completed" && (
                           <div className="flex gap-1 mt-2 justify-end">
@@ -605,12 +748,16 @@ export function POSInterface() {
             <div className="flex justify-between font-semibold">
               <span>Total del dia:</span>
               <span className="text-primary">
-                ${todaySales.filter(s => s.status === "completed").reduce((sum, s) => sum + s.total, 0).toFixed(2)}
+                $
+                {todaySales
+                  .filter((s) => s.status === "completed")
+                  .reduce((sum, s) => sum + s.total, 0)
+                  .toFixed(2)}
               </span>
             </div>
           </div>
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

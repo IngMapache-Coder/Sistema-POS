@@ -170,7 +170,7 @@ export default function GastosPage() {
   return (
     <div className="flex h-screen overflow-hidden">
       <AppSidebar />
-      <main className="flex-1 p-6 overflow-hidden flex flex-col">
+      <main className="flex-1 p-6 overflow-auto flex flex-col">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold">Registro de Gastos</h1>
