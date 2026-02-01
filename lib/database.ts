@@ -23,6 +23,7 @@ const STORAGE_KEYS = {
   EMPLOYEE_PAYMENTS: "pos_employee_payments",
   DAILY_CLOSURES: "pos_daily_closures",
   CONFIG: "pos_config",
+  CASH_REGISTER_STATUS: "pos_cash_register_status",
 };
 
 // Helper functions
@@ -41,7 +42,7 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
-function getTodayDate(): string {
+export function getTodayDate(): string {
   return new Date().toISOString().split("T")[0];
 }
 
@@ -203,7 +204,12 @@ export function getTodaySales(): Sale[] {
 
 export function saveSale(
   sale: Omit<Sale, "id" | "createdAt" | "status">,
-): Sale {
+): Sale | null {
+  // Check if daily closure exists
+  if (hasDailyClosure()) {
+    return null;
+  }
+  
   const sales = getSales();
   const newSale: Sale = {
     ...sale,
@@ -261,7 +267,11 @@ export function getTodayExpenses(): Expense[] {
 
 export function saveExpense(
   expense: Omit<Expense, "id" | "createdAt">,
-): Expense {
+): Expense | null {
+  // Check if daily closure exists
+  if (hasDailyClosure()) {
+    return null;
+  }
   const expenses = getExpenses();
   const newExpense: Expense = {
     ...expense,
@@ -293,7 +303,11 @@ export function getTodayEmployeePayments(): EmployeePayment[] {
 
 export function saveEmployeePayment(
   payment: Omit<EmployeePayment, "id" | "createdAt">,
-): EmployeePayment {
+): EmployeePayment | null {
+  // Check if daily closure exists
+  if (hasDailyClosure()) {
+    return null;
+  }
   const payments = getEmployeePayments();
   const newPayment: EmployeePayment = {
     ...payment,
@@ -367,6 +381,7 @@ export function createDailyClosure(): DailyClosure {
 
   closures.push(closure);
   saveToStorage(STORAGE_KEYS.DAILY_CLOSURES, closures);
+  setCashRegisterStatus("closed");
   return closure;
 }
 
@@ -380,6 +395,7 @@ export function getConfig(): SystemConfig {
     businessPhone: "",
     businessNIT: "",
     dailyBase: 500,
+    reopenPassword: "1234"
   });
 }
 
@@ -390,23 +406,43 @@ export function updateConfig(updates: Partial<SystemConfig>): SystemConfig {
   return newConfig;
 }
 
-// Statistics
 export function getDailyStats(days: number = 30): DailyStats[] {
   const closures = getDailyClosures();
+  const today = getTodayDate();
   const stats: DailyStats[] = [];
+
+  // Get today's data from memory (not yet in closures)
+  const todaySales = getTodaySales();
+  const todayExpenses = getTodayExpenses();
+  const todayPayments = getTodayEmployeePayments();
+  
+  const todayTotalSales = todaySales.reduce((sum, s) => sum + s.total, 0);
+  const todayTotalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const todayTotalPayments = todayPayments.reduce((sum, p) => sum + p.finalAmount, 0);
 
   for (let i = days - 1; i >= 0; i--) {
     const date = new Date();
     date.setDate(date.getDate() - i);
     const dateStr = date.toISOString().split("T")[0];
 
-    const closure = closures.find((c) => c.date === dateStr);
-    stats.push({
-      date: dateStr,
-      totalSales: closure?.totalSales || 0,
-      totalExpenses: closure?.totalExpenses || 0,
-      totalPayments: closure?.totalPayments || 0,
-    });
+    if (dateStr === today) {
+      // Use today's data from memory
+      stats.push({
+        date: dateStr,
+        totalSales: todayTotalSales,
+        totalExpenses: todayTotalExpenses,
+        totalPayments: todayTotalPayments,
+      });
+    } else {
+      // Use data from closures
+      const closure = closures.find((c) => c.date === dateStr);
+      stats.push({
+        date: dateStr,
+        totalSales: closure?.totalSales || 0,
+        totalExpenses: closure?.totalExpenses || 0,
+        totalPayments: closure?.totalPayments || 0,
+      });
+    }
   }
 
   return stats;
@@ -414,19 +450,46 @@ export function getDailyStats(days: number = 30): DailyStats[] {
 
 export function getMonthlyStats(months: number = 12): MonthlyStats[] {
   const closures = getDailyClosures();
+  const today = getTodayDate();
+  const currentMonth = today.slice(0, 7); // "YYYY-MM"
   const stats: MonthlyStats[] = [];
+
+  // Get today's data from memory
+  const todaySales = getTodaySales();
+  const todayExpenses = getTodayExpenses();
+  const todayPayments = getTodayEmployeePayments();
+  
+  const todayTotalSales = todaySales.reduce((sum, s) => sum + s.total, 0);
+  const todayTotalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const todayTotalPayments = todayPayments.reduce((sum, p) => sum + p.finalAmount, 0);
 
   for (let i = months - 1; i >= 0; i--) {
     const date = new Date();
     date.setMonth(date.getMonth() - i);
     const monthStr = date.toISOString().slice(0, 7);
 
-    const monthClosures = closures.filter((c) => c.date.startsWith(monthStr));
+    // Filter closures for this month, excluding today if it's current month
+    const monthClosures = closures.filter((c) => 
+      c.date.startsWith(monthStr) && 
+      (monthStr !== currentMonth || c.date !== today)
+    );
+    
+    let monthSales = monthClosures.reduce((sum, c) => sum + c.totalSales, 0);
+    let monthExpenses = monthClosures.reduce((sum, c) => sum + c.totalExpenses, 0);
+    let monthPayments = monthClosures.reduce((sum, c) => sum + c.totalPayments, 0);
+    
+    // Add today's data if it's the current month
+    if (monthStr === currentMonth) {
+      monthSales += todayTotalSales;
+      monthExpenses += todayTotalExpenses;
+      monthPayments += todayTotalPayments;
+    }
+
     stats.push({
       month: monthStr,
-      totalSales: monthClosures.reduce((sum, c) => sum + c.totalSales, 0),
-      totalExpenses: monthClosures.reduce((sum, c) => sum + c.totalExpenses, 0),
-      totalPayments: monthClosures.reduce((sum, c) => sum + c.totalPayments, 0),
+      totalSales: monthSales,
+      totalExpenses: monthExpenses,
+      totalPayments: monthPayments,
     });
   }
 
@@ -497,6 +560,10 @@ export function getBottomProducts(n: number, period?: string): ProductStats[] {
   return Array.from(productMap.values())
     .sort((a, b) => a.totalQuantity - b.totalQuantity)
     .slice(0, n);
+}
+// NEW FUNCTION: Check if today's closure exists
+export function hasDailyClosure(): boolean {
+  return getCashRegisterStatus() === "closed";
 }
 
 // Initialize with sample data if empty
@@ -625,4 +692,60 @@ export function initializeSampleData(): void {
   ];
 
   employees.forEach((e) => saveEmployee(e));
+}
+
+// NEW FUNCTIONS: Cash register status
+export function getCashRegisterStatus(): "open" | "closed" {
+  const today = getTodayDate();
+  const status = getFromStorage<{date: string, status: "open" | "closed"}>(STORAGE_KEYS.CASH_REGISTER_STATUS, {date: "", status: "open"});
+  
+  // Si es un día nuevo, reiniciar a abierto
+  if (status.date !== today) {
+    setCashRegisterStatus("open");
+    return "open";
+  }
+  
+  return status.status;
+}
+
+export function setCashRegisterStatus(status: "open" | "closed"): void {
+  const today = getTodayDate();
+  saveToStorage(STORAGE_KEYS.CASH_REGISTER_STATUS, {date: today, status});
+}
+
+export function reopenCashRegister(password: string): boolean {
+  const config = getConfig();
+  if (password === config.reopenPassword) {
+    deleteTodayClosure();
+    setCashRegisterStatus("open");
+    return true;
+  }
+  return false;
+}
+
+export function deleteTodayClosure(): boolean {
+  const closures = getDailyClosures();
+  const today = getTodayDate();
+  
+  const initialLength = closures.length;
+  const filtered = closures.filter(c => c.date !== today);
+  
+  if (filtered.length === initialLength) {
+    return false; // No closure found for today
+  }
+  
+  saveToStorage(STORAGE_KEYS.DAILY_CLOSURES, filtered);
+  return true;
+}
+
+export function deleteEmployeePayment(id: string): boolean {
+  const payments = getEmployeePayments();
+  const filtered = payments.filter(p => p.id !== id);
+  
+  if (filtered.length === payments.length) {
+    return false; // Payment not found
+  }
+  
+  saveToStorage(STORAGE_KEYS.EMPLOYEE_PAYMENTS, filtered);
+  return true;
 }

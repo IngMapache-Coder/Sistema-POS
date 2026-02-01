@@ -19,6 +19,7 @@ import {
   getTopProducts,
   getBottomProducts,
   getConfig,
+  getTodayDate,
 } from "@/lib/database";
 import type { DailyStats, MonthlyStats, ProductStats } from "@/lib/types";
 import {
@@ -55,6 +56,31 @@ export default function ReportesPage() {
     loadData(config.topN, "all");
   }, []);
 
+  const formatChartDate = (dateStr: string) => {
+    // dateStr viene como "YYYY-MM-DD"
+    const [year, month, day] = dateStr.split("-").map(Number);
+
+    // Crear fecha en hora local (no UTC)
+    const date = new Date(year, month - 1, day);
+
+    return date.toLocaleDateString("es-MX", {
+      day: "2-digit",
+      month: "short",
+    });
+  };
+
+  const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return "-";
+    const [year, month, day] = dateStr.split("-").map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString("es-MX", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
   const loadData = (n: number, selectedPeriod: string) => {
     setDailyStats(getDailyStats(30));
     setMonthlyStats(getMonthlyStats(12));
@@ -72,10 +98,7 @@ export default function ReportesPage() {
   };
 
   const dailyChartData = dailyStats.map((stat) => ({
-    date: new Date(stat.date).toLocaleDateString("es-MX", {
-      day: "2-digit",
-      month: "short",
-    }),
+    date: formatChartDate(stat.date),
     Ventas: Number(stat.totalSales),
     Gastos: Number(stat.totalExpenses),
     Pagos: Number(stat.totalPayments),
@@ -106,15 +129,23 @@ export default function ReportesPage() {
     totalSales30Days /
     Math.max(dailyStats.filter((s) => s.totalSales > 0).length, 1);
 
-  const bestSalesDay = dailyStats.reduce(
-    (best, s) => (s.totalSales > best.totalSales ? s : best),
-    dailyStats[0] || { date: "", totalSales: 0 },
-  );
+  const daysWithSales = dailyStats.filter((s) => s.totalSales > 0);
 
-  const worstSalesDay = dailyStats.reduce(
-    (worst, s) => (s.totalSales < worst.totalSales ? s : worst),
-    dailyStats[0] || { date: "", totalSales: 0 },
-  );
+  const bestSalesDay =
+    daysWithSales.length > 0
+      ? daysWithSales.reduce(
+          (best, s) => (s.totalSales > best.totalSales ? s : best),
+          daysWithSales[0],
+        )
+      : { date: "", totalSales: 0 };
+
+  const worstSalesDay =
+    daysWithSales.length > 0
+      ? daysWithSales.reduce(
+          (worst, s) => (s.totalSales < worst.totalSales ? s : worst),
+          daysWithSales[0],
+        )
+      : { date: "", totalSales: 0 };
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -171,9 +202,7 @@ export default function ReportesPage() {
                     ${bestSalesDay.totalSales.toFixed(2)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {bestSalesDay.date
-                      ? new Date(bestSalesDay.date).toLocaleDateString("es-MX")
-                      : "-"}
+                    {formatDisplayDate(bestSalesDay.date)}
                   </p>
                 </CardContent>
               </Card>
@@ -190,9 +219,7 @@ export default function ReportesPage() {
                     ${worstSalesDay.totalSales.toFixed(2)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {worstSalesDay.date
-                      ? new Date(worstSalesDay.date).toLocaleDateString("es-MX")
-                      : "-"}
+                    {formatDisplayDate(worstSalesDay.date)}
                   </p>
                 </CardContent>
               </Card>

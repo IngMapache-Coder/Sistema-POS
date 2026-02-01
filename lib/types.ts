@@ -101,6 +101,7 @@ export interface SystemConfig {
   businessPhone: string
   businessNIT: string
   dailyBase: number
+  reopenPassword: string
 }
 
 export interface CartItem extends SaleItem {

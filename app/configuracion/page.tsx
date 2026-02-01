@@ -1,6 +1,6 @@
 "use client";
 
-import { InputNumber } from '@/components/ui/input-number'
+import { InputNumber } from "@/components/ui/input-number";
 import { useState, useEffect } from "react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ export default function ConfiguracionPage() {
     businessPhone: "",
     businessNIT: "",
     dailyBase: 0,
+    reopenPassword: "",
   });
   const [hasChanges, setHasChanges] = useState(false);
   const { toast } = useToast();
@@ -150,13 +151,30 @@ export default function ConfiguracionPage() {
                 <div className="space-y-2">
                   <Label htmlFor="dailyBase">Base Diaria de Caja</Label>{" "}
                   <InputNumber
-  id="dailyBase"
-  value={config.dailyBase}
-  onChange={(value) => handleChange("dailyBase", value)}
-  placeholder="500"
-/>
+                    id="dailyBase"
+                    value={config.dailyBase}
+                    onChange={(value) => handleChange("dailyBase", value)}
+                    placeholder="500"
+                  />
                   <p className="text-xs text-muted-foreground">
                     Cantidad de dinero con la que inicia la caja cada día
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reopenPassword">
+                    Contraseña para Reabrir Caja
+                  </Label>
+                  <Input
+                    id="reopenPassword"
+                    type="password"
+                    value={config.reopenPassword}
+                    onChange={(e) =>
+                      handleChange("reopenPassword", e.target.value)
+                    }
+                    placeholder="Ej: 1234"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Contraseña para reabrir la caja después del cierre
                   </p>
                 </div>
               </CardContent>
@@ -177,12 +195,14 @@ export default function ConfiguracionPage() {
                 <div className="space-y-2">
                   <Label htmlFor="topN">Número de productos en Top N</Label>
                   <InputNumber
-  id="topN"
-  value={config.topN}
-  onChange={(value) => handleChange("topN", Math.max(1, Math.min(50, value)))}
-  min={1}
-  max={50}
-/>
+                    id="topN"
+                    value={config.topN}
+                    onChange={(value) =>
+                      handleChange("topN", Math.max(1, Math.min(50, value)))
+                    }
+                    min={1}
+                    max={50}
+                  />
                   <p className="text-xs text-muted-foreground">
                     Define cuántos productos mostrar en las listas de más/menos
                     vendidos (1-50)

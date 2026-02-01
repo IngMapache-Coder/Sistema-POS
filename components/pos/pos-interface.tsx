@@ -25,6 +25,7 @@ import {
   getTodaySales,
   cancelSale,
   initializeSampleData,
+  hasDailyClosure,
   getConfig,
 } from "@/lib/database";
 import type { Category, Product, CartItem, Sale } from "@/lib/types";
@@ -177,6 +178,14 @@ export function POSInterface() {
   };
 
   const handleCompleteSale = () => {
+    if (hasDailyClosure()) {
+      toast({
+        title: "Cierre de caja realizado",
+        description: "No se pueden registrar ventas después del cierre de caja",
+        variant: "destructive",
+      });
+      return;
+    }
     if (payment.method === "mixed") {
       const total = payment.cashAmount + payment.transferAmount;
       if (Math.abs(total - cartTotal) > 0.01) {
@@ -217,10 +226,12 @@ export function POSInterface() {
       paymentMethod: payment.method,
     });
 
-    toast({
-      title: "Venta completada",
-      description: `Venta #${sale.id.slice(-6).toUpperCase()} por $${cartTotal.toFixed(2)}`,
-    });
+    if (sale) {
+      toast({
+        title: "Venta completada",
+        description: `Venta #${sale.id.slice(-6).toUpperCase()} por $${cartTotal.toFixed(2)}`,
+      });
+    }
 
     clearCart();
     setShowPaymentDialog(false);
@@ -822,6 +833,12 @@ export function POSInterface() {
                               variant="destructive"
                               size="sm"
                               onClick={() => handleCancelSale(sale.id)}
+                              disabled={hasDailyClosure()}
+                              title={
+                                hasDailyClosure()
+                                  ? "No se pueden anular ventas con caja cerrada"
+                                  : "Anular venta"
+                              }
                             >
                               <Ban className="h-4 w-4" />
                             </Button>

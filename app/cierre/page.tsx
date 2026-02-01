@@ -1,9 +1,16 @@
 "use client";
 
+import { ReopenCashRegisterForm } from "@/components/ui/reopen-cash-register-form";
 import { useState, useEffect } from "react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -33,6 +40,7 @@ import {
   createDailyClosure,
   getDailyClosures,
   getConfig,
+  hasDailyClosure,
 } from "@/lib/database";
 import type {
   Sale,
@@ -77,12 +85,17 @@ export default function CierrePage() {
     setTodayPayments(getTodayEmployeePayments());
     setLowStockProducts(getLowStockProducts());
 
-    // Check if today's closure already exists
+    // Check if today's closure already exists AND cash register is closed
     const closures = getDailyClosures();
     const today = new Date().toISOString().split("T")[0];
     const existing = closures.find((c) => c.date === today);
-    if (existing) {
+    const isClosed = hasDailyClosure(); // Necesitas importar esta función
+
+    // Solo mostrar cierre si existe Y la caja está cerrada
+    if (existing && isClosed) {
       setTodayClosure(existing);
+    } else {
+      setTodayClosure(null);
     }
   };
 
@@ -216,12 +229,12 @@ export default function CierrePage() {
               margin-bottom: 3px;
               color: #555;
             }
-              .business-nit {
-          font-size: 10px;
-          margin-bottom: 3px;
-          color: #555;
-          font-weight: bold;
-        }
+            .business-nit {
+              font-size: 10px;
+              margin-bottom: 3px;
+              color: #555;
+              font-weight: bold;
+            }
             .iva-notice {
               font-size: 9px;
               color: #666;
@@ -238,9 +251,9 @@ export default function CierrePage() {
           <body>
             <div class="header">
               <div class="business-name">${config.businessName || "RESTAURANTE"}</div>
-            ${config.businessAddress ? `<div class="business-info">${config.businessAddress}</div>` : ''}
-            ${config.businessPhone ? `<div class="business-info">Tel: ${config.businessPhone}</div>` : ''}
-            ${config.businessNIT ? `<div class="business-nit">NIT: ${config.businessNIT}</div>` : ''}
+            ${config.businessAddress ? `<div class="business-info">${config.businessAddress}</div>` : ""}
+            ${config.businessPhone ? `<div class="business-info">Tel: ${config.businessPhone}</div>` : ""}
+            ${config.businessNIT ? `<div class="business-nit">NIT: ${config.businessNIT}</div>` : ""}
             <div class="business-info">CIERRE DE CAJA</div>
             <div class="business-info">${new Date().toLocaleDateString("es-MX")}</div>
             </div>
@@ -639,6 +652,37 @@ export default function CierrePage() {
                 Imprimir Reporte
               </Button>
             </div>
+
+            {/* Reopen Cash Register Button */}
+            {todayClosure && (
+              <div className="mt-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5 text-warning" />
+                      Reabrir Caja
+                    </CardTitle>
+                    <CardDescription>
+                      Usa esta opción solo si necesitas registrar más
+                      movimientos después del cierre
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ReopenCashRegisterForm
+                      onReopen={() => {
+                        setTodayClosure(null);
+                        loadData();
+                        toast({
+                          title: "Caja reabierta",
+                          description:
+                            "Ya puedes registrar ventas, gastos y pagos",
+                        });
+                      }}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </div>
         </ScrollArea>
 
