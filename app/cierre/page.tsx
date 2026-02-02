@@ -429,33 +429,9 @@ export default function CierrePage() {
                   .join("") || "<div>Sin pagos registrados</div>"
               }
               <div class="total-line">
-                <div class="item"><span>TOTAL PAGOS (de caja)</span><span>-$${paymentsFromCashRegister.toFixed(2)}</span></div>
-                <div class="item"><span>TOTAL PAGOS (total)</span><span>-$${totalPayments.toFixed(2)}</span></div>
-              </div>
-            </div>
-
-            <div class="section">
-              <div class="section-title">RESUMEN FINAL</div>
-              <div class="item">
-                <span>Ventas totales:</span>
-                <span>$${totalSales.toFixed(2)}</span>
-              </div>
-              <div class="item">
-                <span>- Gastos:</span>
-                <span>-$${totalExpenses.toFixed(2)}</span>
-              </div>
-              <div class="item">
-                <span>- Pagos empleados (total):</span>
-                <span>-$${totalPayments.toFixed(2)}</span>
-              </div>
-              <div class="total-line">
-                <div class="item">
-                  <span>RESULTADO NETO:</span>
-                  <span>$${(totalSales - totalExpenses - totalPayments).toFixed(2)}</span>
-                </div>
-              </div>
-              <div style="font-size: 9px; color: #666; margin-top: 5px;">
-                * Los pagos "fuera de caja" no afectan el dinero físico en caja
+                <div class="item"><span>PAGOS (de caja)</span><span>-$${paymentsFromCashRegister.toFixed(2)}</span></div>
+                <div class="item"><span>PAGOS (fuera de caja)</span><span>-$${paymentsNotFromCashRegister.toFixed(2)}</span></div>
+                <div class="item"><span>TOTAL PAGOS</span><span>-$${totalPayments.toFixed(2)}</span></div>
               </div>
             </div>
           </body>

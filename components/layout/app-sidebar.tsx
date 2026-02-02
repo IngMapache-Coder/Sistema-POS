@@ -12,7 +12,13 @@ import {
   BarChart3,
   Settings,
   Wallet,
+  Cat,
+  PawPrint,
 } from "lucide-react"
+import { FaCat } from "react-icons/fa"
+import{GiCat} from"react-icons/gi"
+import { MdOutlinePets } from "react-icons/md"
+import { PiCatDuotone } from "react-icons/pi";
 
 const navigation = [
   { name: "Ventas", href: "/", icon: ShoppingCart },
@@ -20,6 +26,7 @@ const navigation = [
   { name: "Empleados", href: "/empleados", icon: Users },
   { name: "Gastos", href: "/gastos", icon: Wallet },
   { name: "Cierre de Caja", href: "/cierre", icon: Calculator },
+  { name: "Cierre de caja historico", href: "/cierres-historicos", icon: Receipt },
   { name: "Reportes", href: "/reportes", icon: BarChart3 },
   { name: "Configuracion", href: "/configuracion", icon: Settings },
 ]
@@ -32,11 +39,11 @@ export function AppSidebar() {
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-lg bg-sidebar-primary flex items-center justify-center">
-            <Receipt className="h-6 w-6 text-sidebar-primary-foreground" />
+            <PiCatDuotone className="h-6 w-6 text-sidebar-primary-foreground" />
           </div>
           <div className="hidden lg:block">
-            <h1 className="font-bold text-lg">POS</h1>
-            <p className="text-xs text-sidebar-foreground/70">Restaurante</p>
+            <h1 className="font-bold text-lg">Tabby</h1>
+            <p className="text-xs text-sidebar-foreground/70">Sistema POS</p>
           </div>
         </div>
       </div>

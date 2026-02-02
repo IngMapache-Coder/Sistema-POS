@@ -8,9 +8,11 @@ import './globals.css'
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Sistema POS - Restaurante',
+  title: 'Tabby - Sistema POS para Restaurantes',
   description: 'Sistema de punto de venta para restaurante con gestión de ventas, inventario, empleados y reportes',
-  generator: 'v0.app',
+  icons: {
+    icon: '/icon.ico',
+  },
 }
 
 export const viewport: Viewport = {
