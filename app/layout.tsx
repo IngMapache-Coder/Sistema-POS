@@ -1,8 +1,10 @@
+// app/layout.tsx (actualizado)
 import React from "react"
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/toaster'
+import { AuthGuard } from "@/components/layout/auth-guard"
 import './globals.css'
 
 const inter = Inter({ subsets: ["latin"] });
@@ -31,7 +33,9 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={`${inter.className} font-sans antialiased touch-manipulation`}>
-        {children}
+        <AuthGuard>
+          {children}
+        </AuthGuard>
         <Toaster />
         <Analytics />
       </body>

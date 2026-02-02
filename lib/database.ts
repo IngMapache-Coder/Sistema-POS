@@ -1361,3 +1361,153 @@ export async function reopenCashRegister(password: string): Promise<boolean> {
     return false;
   }
 }
+
+// Función para verificar credenciales con Supabase
+export async function verifyLogin(username: string, password: string): Promise<any> {
+  try {
+    // Opción 1: Usar función PostgreSQL (recomendado)
+    const { data, error } = await supabase
+      .rpc('verify_user_password', {
+        username_text: username,
+        password_text: password
+      });
+
+    if (error) throw error;
+    
+    if (data && data.length > 0) {
+      return {
+        id: data[0].id,
+        username: data[0].username,
+        name: data[0].name,
+        role: data[0].role
+      };
+    }
+    
+    // Opción 2: Consulta directa (para desarrollo simple)
+    const { data: users, error: queryError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('username', username)
+      .eq('is_active', true)
+      .single();
+
+    if (queryError) throw queryError;
+
+    // Validación simple para desarrollo (NO para producción)
+    if (users) {
+      const validPasswords: Record<string, string> = {
+        'admin': 'admin123',
+        'caja': 'caja123',
+        'empleado': 'empleado123'
+      };
+
+      if (validPasswords[username] === password) {
+        return {
+          id: users.id,
+          username: users.username,
+          name: users.name,
+          role: users.role
+        };
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error en verifyLogin:', error);
+    return null;
+  }
+}
+
+// Función para actualizar último login
+export async function updateLastLogin(userId: string): Promise<void> {
+  try {
+    await supabase
+      .from('users')
+      .update({ 
+        last_login: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+  } catch (error) {
+    console.error('Error al actualizar último login:', error);
+  }
+}
+
+// Función para obtener usuario por ID
+export async function getUserById(userId: string): Promise<any> {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, username, name, role, last_login')
+      .eq('id', userId)
+      .eq('is_active', true)
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error al obtener usuario:', error);
+    return null;
+  }
+}
+
+// Función para crear usuario (solo admin)
+export async function createUser(userData: {
+  username: string;
+  name: string;
+  role: string;
+  password: string;
+}): Promise<any> {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .insert({
+        username: userData.username,
+        name: userData.name,
+        role: userData.role,
+        password_hash: userData.password, // En producción, hash esta contraseña
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error al crear usuario:', error);
+    return null;
+  }
+}
+
+// Funciones de permisos locales (mantener)
+export function checkPermission(requiredRoles: string[]): boolean {
+  if (typeof window === "undefined") return false;
+  
+  const userData = localStorage.getItem("pos_user");
+  if (!userData) return false;
+  
+  try {
+    const user = JSON.parse(userData);
+    return requiredRoles.includes(user.role);
+  } catch {
+    return false;
+  }
+}
+
+export function getCurrentUser() {
+  if (typeof window === "undefined") return null;
+  
+  const userData = localStorage.getItem("pos_user");
+  if (!userData) return null;
+  
+  try {
+    return JSON.parse(userData);
+  } catch {
+    return null;
+  }
+}
+
+export function logout() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("pos_user");
+}
