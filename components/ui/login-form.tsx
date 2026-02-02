@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { verifyLogin, updateLastLogin } from "@/lib/database";
 import { Lock, User, AlertCircle, Building2, Eye, EyeOff } from "lucide-react";
+import { PiCatDuotone } from "react-icons/pi";
 
 export function LoginForm() {
   const [username, setUsername] = useState("");
@@ -81,7 +82,7 @@ export function LoginForm() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-linear-to-br from-blue-50 via-white to-indigo-50 p-4">
       <div className="mb-8 text-center">
         <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary mb-4">
-          <Building2 className="h-10 w-10 text-primary-foreground" />
+          <PiCatDuotone className="h-10 w-10 text-primary-foreground" />
         </div>
         <h1 className="text-3xl font-bold text-gray-800">Tabby POS</h1>
         <p className="text-gray-600 mt-2">Sistema de Punto de Venta para Restaurantes</p>
