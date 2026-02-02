@@ -49,20 +49,16 @@ export default function ReportesPage() {
   const [bottomProducts, setBottomProducts] = useState<ProductStats[]>([]);
   const [topN, setTopN] = useState(10);
   const [period, setPeriod] = useState<string>("all");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const config = getConfig();
-    setTopN(config.topN);
-    loadData(config.topN, "all");
+    loadData();
   }, []);
 
   const formatChartDate = (dateStr: string) => {
-    // dateStr viene como "YYYY-MM-DD"
+    if (!dateStr) return "";
     const [year, month, day] = dateStr.split("-").map(Number);
-
-    // Crear fecha en hora local (no UTC)
     const date = new Date(year, month - 1, day);
-
     return date.toLocaleDateString("es-MX", {
       day: "2-digit",
       month: "short",
@@ -81,20 +77,44 @@ export default function ReportesPage() {
     });
   };
 
-  const loadData = (n: number, selectedPeriod: string) => {
-    setDailyStats(getDailyStats(30));
-    setMonthlyStats(getMonthlyStats(12));
-
-    const periodFilter = selectedPeriod === "all" ? undefined : selectedPeriod;
-    setTopProducts(getTopProducts(n, periodFilter));
-    setBottomProducts(getBottomProducts(n, periodFilter));
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      const config = await getConfig();
+      setTopN(config.topN);
+      
+      const [dailyData, monthlyData, topData, bottomData] = await Promise.all([
+        getDailyStats(30),
+        getMonthlyStats(12),
+        getTopProducts(config.topN, "all"),
+        getBottomProducts(config.topN, "all")
+      ]);
+      
+      setDailyStats(dailyData);
+      setMonthlyStats(monthlyData);
+      setTopProducts(topData);
+      setBottomProducts(bottomData);
+    } catch (error) {
+      console.error("Error loading report data:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handlePeriodChange = (value: string) => {
+  const handlePeriodChange = async (value: string) => {
     setPeriod(value);
-    const periodFilter = value === "all" ? undefined : value;
-    setTopProducts(getTopProducts(topN, periodFilter));
-    setBottomProducts(getBottomProducts(topN, periodFilter));
+    try {
+      const periodFilter = value === "all" ? undefined : value;
+      const [topData, bottomData] = await Promise.all([
+        getTopProducts(topN, periodFilter),
+        getBottomProducts(topN, periodFilter)
+      ]);
+      setTopProducts(topData);
+      setBottomProducts(bottomData);
+    } catch (error) {
+      console.error("Error changing period:", error);
+    }
   };
 
   const dailyChartData = dailyStats.map((stat) => ({
@@ -146,6 +166,19 @@ export default function ReportesPage() {
           daysWithSales[0],
         )
       : { date: "", totalSales: 0 };
+
+  if (loading) {
+    return (
+      <div className="flex h-screen overflow-hidden">
+        <AppSidebar />
+        <main className="flex-1 p-6 overflow-auto flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-muted-foreground">Cargando reportes...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden">

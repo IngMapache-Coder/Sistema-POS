@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";  // Importamos Switch
 import {
   Dialog,
   DialogContent,
@@ -54,6 +55,7 @@ import {
   Users,
   DollarSign,
   Briefcase,
+  Wallet,
 } from "lucide-react";
 
 const POSITIONS = [
@@ -72,14 +74,14 @@ export default function EmpleadosPage() {
   const [showEmployeeDialog, setShowEmployeeDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showDeletePaymentDialog, setShowDeletePaymentDialog] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [payingEmployee, setPayingEmployee] = useState<Employee | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
-  const { toast } = useToast();
-  const [showDeletePaymentDialog, setShowDeletePaymentDialog] = useState(false);
   const [deletePaymentId, setDeletePaymentId] = useState<string | null>(null);
   const [deletePaymentEmployeeName, setDeletePaymentEmployeeName] =
     useState<string>("");
+  const { toast } = useToast();
 
   // Form states
   const [employeeForm, setEmployeeForm] = useState({
@@ -90,52 +92,43 @@ export default function EmpleadosPage() {
   const [paymentForm, setPaymentForm] = useState({
     amount: 0,
     notes: "",
+    fromCashRegister: true,  // Por defecto sale de caja
   });
 
-  const openDeletePaymentDialog = (paymentId: string, employeeName: string) => {
-    setDeletePaymentId(paymentId);
-    setDeletePaymentEmployeeName(employeeName);
-    setShowDeletePaymentDialog(true);
-  };
-
-  const handleDeletePayment = () => {
-    if (!deletePaymentId) return;
-
-    if (hasDailyClosure()) {
-      toast({
-        title: "Caja cerrada",
-        description: "No se pueden eliminar pagos después del cierre de caja",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const success = deleteEmployeePayment(deletePaymentId);
-
-    if (success) {
-      toast({
-        title: "Pago eliminado",
-        description: `El pago de ${deletePaymentEmployeeName} ha sido eliminado`,
-      });
-      setShowDeletePaymentDialog(false);
-      loadData(); // Recargar datos
-    } else {
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el pago",
-        variant: "destructive",
-      });
-    }
-  };
-
   useEffect(() => {
-    initializeSampleData();
-    loadData();
+    initializeData();
   }, []);
 
-  const loadData = () => {
-    setEmployees(getActiveEmployees());
-    setTodayPayments(getTodayEmployeePayments());
+  const initializeData = async () => {
+    try {
+      await initializeSampleData();
+      await loadData();
+    } catch (error) {
+      console.error("Error initializing data:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const loadData = async () => {
+    try {
+      const [employeesData, paymentsData] = await Promise.all([
+        getActiveEmployees(),
+        getTodayEmployeePayments()
+      ]);
+      setEmployees(employeesData);
+      setTodayPayments(paymentsData);
+    } catch (error) {
+      console.error("Error loading data:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos",
+        variant: "destructive",
+      });
+    }
   };
 
   const getPaymentForEmployee = (employeeId: string) => {
@@ -162,7 +155,7 @@ export default function EmpleadosPage() {
     setShowEmployeeDialog(true);
   };
 
-  const handleSaveEmployee = () => {
+  const handleSaveEmployee = async () => {
     if (!employeeForm.name.trim()) {
       toast({
         title: "Error",
@@ -181,16 +174,25 @@ export default function EmpleadosPage() {
       return;
     }
 
-    if (editingEmployee) {
-      updateEmployee(editingEmployee.id, employeeForm);
-      toast({ title: "Empleado actualizado" });
-    } else {
-      saveEmployee({ ...employeeForm, isActive: true });
-      toast({ title: "Empleado registrado" });
-    }
+    try {
+      if (editingEmployee) {
+        await updateEmployee(editingEmployee.id, employeeForm);
+        toast({ title: "Empleado actualizado" });
+      } else {
+        await saveEmployee({ ...employeeForm, isActive: true });
+        toast({ title: "Empleado registrado" });
+      }
 
-    setShowEmployeeDialog(false);
-    loadData();
+      setShowEmployeeDialog(false);
+      await loadData();
+    } catch (error) {
+      console.error("Error saving employee:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo guardar el empleado",
+        variant: "destructive",
+      });
+    }
   };
 
   // Payment handlers
@@ -209,46 +211,59 @@ export default function EmpleadosPage() {
     setPaymentForm({
       amount: employee.dailyPayBase,
       notes: "",
+      fromCashRegister: true,  // Por defecto sale de caja
     });
     setShowPaymentDialog(true);
   };
 
-  const handleSavePayment = () => {
-    if (hasDailyClosure()) {
-      toast({
-        title: "Cierre de caja realizado",
-        description: "No se pueden registrar pagos después del cierre de caja",
-        variant: "destructive",
-      });
-      return;
-    }
+  const handleSavePayment = async () => {
     if (!payingEmployee) return;
 
-    if (paymentForm.amount < 0) {
+    try {
+      const isClosed = await hasDailyClosure();
+      if (isClosed) {
+        toast({
+          title: "Cierre de caja realizado",
+          description: "No se pueden registrar pagos después del cierre de caja",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (paymentForm.amount < 0) {
+        toast({
+          title: "Error",
+          description: "El monto del pago debe ser mayor o igual a 0",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      await saveEmployeePayment({
+        employeeId: payingEmployee.id,
+        employeeName: payingEmployee.name,
+        position: payingEmployee.position,
+        baseAmount: payingEmployee.dailyPayBase,
+        finalAmount: paymentForm.amount,
+        notes: paymentForm.notes,
+        fromCashRegister: paymentForm.fromCashRegister,
+      });
+
+      toast({
+        title: "Pago registrado",
+        description: `Se registro un pago de $${paymentForm.amount.toFixed(2)} para ${payingEmployee.name} ${paymentForm.fromCashRegister ? '(salió de caja)' : '(no salió de caja)'}`,
+      });
+
+      setShowPaymentDialog(false);
+      await loadData();
+    } catch (error) {
+      console.error("Error saving payment:", error);
       toast({
         title: "Error",
-        description: "El monto del pago debe ser mayor o igual a 0",
+        description: "No se pudo registrar el pago",
         variant: "destructive",
       });
-      return;
     }
-
-    saveEmployeePayment({
-      employeeId: payingEmployee.id,
-      employeeName: payingEmployee.name,
-      position: payingEmployee.position,
-      baseAmount: payingEmployee.dailyPayBase,
-      finalAmount: paymentForm.amount,
-      notes: paymentForm.notes,
-    });
-
-    toast({
-      title: "Pago registrado",
-      description: `Se registro un pago de $${paymentForm.amount.toFixed(2)} para ${payingEmployee.name}`,
-    });
-
-    setShowPaymentDialog(false);
-    loadData();
   };
 
   // Delete handlers
@@ -257,18 +272,82 @@ export default function EmpleadosPage() {
     setShowDeleteDialog(true);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteTargetId) return;
-    deleteEmployee(deleteTargetId);
-    toast({ title: "Empleado eliminado" });
-    setShowDeleteDialog(false);
-    loadData();
+    
+    try {
+      await deleteEmployee(deleteTargetId);
+      toast({ title: "Empleado eliminado" });
+      setShowDeleteDialog(false);
+      await loadData();
+    } catch (error) {
+      console.error("Error deleting employee:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el empleado",
+        variant: "destructive",
+      });
+    }
   };
 
-  const totalPaymentsToday = todayPayments.reduce(
-    (sum, p) => sum + p.finalAmount,
-    0,
-  );
+  const openDeletePaymentDialog = (paymentId: string, employeeName: string) => {
+    setDeletePaymentId(paymentId);
+    setDeletePaymentEmployeeName(employeeName);
+    setShowDeletePaymentDialog(true);
+  };
+
+  const handleDeletePayment = async () => {
+    if (!deletePaymentId) return;
+
+    try {
+      const isClosed = await hasDailyClosure();
+      if (isClosed) {
+        toast({
+          title: "Caja cerrada",
+          description: "No se pueden eliminar pagos después del cierre de caja",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const success = await deleteEmployeePayment(deletePaymentId);
+
+      if (success) {
+        toast({
+          title: "Pago eliminado",
+          description: `El pago de ${deletePaymentEmployeeName} ha sido eliminado`,
+        });
+        setShowDeletePaymentDialog(false);
+        await loadData();
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudo eliminar el pago",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error deleting payment:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el pago",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Calcular totales con la nueva lógica
+  const totalPaymentsToday = todayPayments.reduce((sum, p) => sum + p.finalAmount, 0);
+  
+  // Pagos que salieron de caja (para el cálculo de dinero en caja)
+  const paymentsFromCashRegister = todayPayments
+    .filter(p => p.fromCashRegister)
+    .reduce((sum, p) => sum + p.finalAmount, 0);
+  
+  // Pagos que NO salieron de caja
+  const paymentsNotFromCashRegister = todayPayments
+    .filter(p => !p.fromCashRegister)
+    .reduce((sum, p) => sum + p.finalAmount, 0);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -288,7 +367,7 @@ export default function EmpleadosPage() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -322,6 +401,24 @@ export default function EmpleadosPage() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                <Wallet className="h-4 w-4 text-destructive" />
+                De Caja
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-bold text-destructive">
+                  ${paymentsFromCashRegister.toFixed(2)}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {todayPayments.filter(p => p.fromCashRegister).length} pagos
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Total Pagado Hoy
               </CardTitle>
@@ -332,6 +429,9 @@ export default function EmpleadosPage() {
                   ${totalPaymentsToday.toFixed(2)}
                 </span>
               </div>
+              <p className="text-xs text-muted-foreground">
+                De caja: ${paymentsFromCashRegister.toFixed(2)}
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -392,28 +492,39 @@ export default function EmpleadosPage() {
                           </p>
                         </div>
                         {payment ? (
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col items-end gap-1">
                             <Badge
                               variant="outline"
-                              className="text-success border-success"
+                              className={`${payment.fromCashRegister ? 'text-destructive border-destructive' : 'text-muted-foreground border-muted-foreground'}`}
                             >
-                              Pagado: ${payment.finalAmount.toFixed(2)}
+                              <div className="flex items-center gap-1">
+                                {payment.fromCashRegister ? (
+                                  <Wallet className="h-3 w-3" />
+                                ) : (
+                                  <DollarSign className="h-3 w-3" />
+                                )}
+                                <span>${payment.finalAmount.toFixed(2)}</span>
+                              </div>
                             </Badge>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-destructive hover:text-destructive"
-                              onClick={() =>
-                                openDeletePaymentDialog(
-                                  payment.id,
-                                  employee.name,
-                                )
-                              }
-                              title="Eliminar pago"
-                              disabled={hasDailyClosure()} // NUEVO
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-muted-foreground">
+                                {payment.fromCashRegister ? 'De caja' : 'Fuera caja'}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-5 w-5 text-destructive hover:text-destructive"
+                                onClick={() =>
+                                  openDeletePaymentDialog(
+                                    payment.id,
+                                    employee.name,
+                                  )
+                                }
+                                title="Eliminar pago"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </div>
                         ) : (
                           <Button
@@ -567,6 +678,9 @@ export default function EmpleadosPage() {
                       <p className="text-sm text-muted-foreground">
                         {payingEmployee.position}
                       </p>
+                      <p className="text-sm text-muted-foreground">
+                        Pago base: ${payingEmployee.dailyPayBase.toFixed(2)}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -606,6 +720,30 @@ export default function EmpleadosPage() {
                   </div>
                 </div>
 
+                {/* Nuevo: Switch para "Salir de caja" */}
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="h-4 w-4" />
+                      <Label>Salir de Caja</Label>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {paymentForm.fromCashRegister
+                        ? "Este pago se restará del dinero en caja"
+                        : "Este pago se pagará por fuera de caja"}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={paymentForm.fromCashRegister}
+                    onCheckedChange={(checked) =>
+                      setPaymentForm((prev) => ({
+                        ...prev,
+                        fromCashRegister: checked,
+                      }))
+                    }
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="paymentNotes">Notas (opcional)</Label>
                   <Textarea
@@ -620,6 +758,32 @@ export default function EmpleadosPage() {
                     placeholder="Ej: Horas extra, bonificacion, descuento por llegada tarde..."
                     rows={3}
                   />
+                </div>
+
+                {/* Resumen del pago */}
+                <div className="rounded-lg bg-primary/5 p-4 space-y-2">
+                  <p className="text-sm font-medium">Resumen del Pago</p>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      Monto:
+                    </span>
+                    <span className="font-semibold">
+                      ${paymentForm.amount.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      Salir de caja:
+                    </span>
+                    <span className={`font-medium ${paymentForm.fromCashRegister ? 'text-destructive' : 'text-success'}`}>
+                      {paymentForm.fromCashRegister ? 'SÍ' : 'NO'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {paymentForm.fromCashRegister
+                      ? "⚠️ Este pago se restará del dinero disponible en caja al final del día"
+                      : "✅ Este pago no afectará el dinero en caja"}
+                  </p>
                 </div>
               </div>
             )}

@@ -11,6 +11,8 @@ interface InputNumberProps extends Omit<React.ComponentProps<typeof Input>, 'val
   maxDecimals?: number
 }
 
+
+
   const formatNumber = (num: number, allowDecimals: boolean, maxDecimals: number): string => {
     if (num === 0) return ""
     

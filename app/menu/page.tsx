@@ -109,13 +109,48 @@ export default function MenuPage() {
   });
 
   useEffect(() => {
-    initializeSampleData();
-    loadData();
+    initializeData();
   }, []);
 
-  const loadData = () => {
-    setCategories(getCategories().sort((a, b) => a.order - b.order));
-    setProducts(getProducts().filter((p) => p.isActive));
+  const initializeData = async () => {
+    try {
+      await initializeSampleData();
+      await loadData();
+    } catch (error) {
+      console.error("Error initializing data:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const loadData = async () => {
+    try {
+      const [categoriesData, productsData] = await Promise.all([
+        getCategories(),
+        getProducts()
+      ]);
+      
+      const sortedCategories = categoriesData.sort((a, b) => a.order - b.order);
+      const activeProducts = productsData.filter((p) => p.isActive);
+      
+      setCategories(sortedCategories);
+      setProducts(activeProducts);
+      
+      // Set default category if none selected
+      if (sortedCategories.length > 0 && !productForm.categoryId) {
+        setProductForm(prev => ({ ...prev, categoryId: sortedCategories[0].id }));
+      }
+    } catch (error) {
+      console.error("Error loading data:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos",
+        variant: "destructive",
+      });
+    }
   };
 
   const filteredProducts =
@@ -143,7 +178,7 @@ export default function MenuPage() {
     setShowCategoryDialog(true);
   };
 
-  const handleSaveCategory = () => {
+  const handleSaveCategory = async () => {
     if (!categoryForm.name.trim()) {
       toast({
         title: "Error",
@@ -153,16 +188,25 @@ export default function MenuPage() {
       return;
     }
 
-    if (editingCategory) {
-      updateCategory(editingCategory.id, categoryForm);
-      toast({ title: "Categoria actualizada" });
-    } else {
-      saveCategory(categoryForm);
-      toast({ title: "Categoria creada" });
-    }
+    try {
+      if (editingCategory) {
+        await updateCategory(editingCategory.id, categoryForm);
+        toast({ title: "Categoria actualizada" });
+      } else {
+        await saveCategory(categoryForm);
+        toast({ title: "Categoria creada" });
+      }
 
-    setShowCategoryDialog(false);
-    loadData();
+      setShowCategoryDialog(false);
+      await loadData();
+    } catch (error) {
+      console.error("Error saving category:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo guardar la categoría",
+        variant: "destructive",
+      });
+    }
   };
 
   // Product handlers
@@ -191,7 +235,7 @@ export default function MenuPage() {
     setShowProductDialog(true);
   };
 
-  const handleSaveProduct = () => {
+  const handleSaveProduct = async () => {
     if (!productForm.name.trim()) {
       toast({
         title: "Error",
@@ -219,16 +263,25 @@ export default function MenuPage() {
       return;
     }
 
-    if (editingProduct) {
-      updateProduct(editingProduct.id, productForm);
-      toast({ title: "Producto actualizado" });
-    } else {
-      saveProduct({ ...productForm, isActive: true });
-      toast({ title: "Producto creado" });
-    }
+    try {
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, productForm);
+        toast({ title: "Producto actualizado" });
+      } else {
+        await saveProduct({ ...productForm, isActive: true });
+        toast({ title: "Producto creado" });
+      }
 
-    setShowProductDialog(false);
-    loadData();
+      setShowProductDialog(false);
+      await loadData();
+    } catch (error) {
+      console.error("Error saving product:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo guardar el producto",
+        variant: "destructive",
+      });
+    }
   };
 
   // Delete handlers
@@ -237,32 +290,41 @@ export default function MenuPage() {
     setShowDeleteDialog(true);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteTarget) return;
 
-    if (deleteTarget.type === "category") {
-      const categoryProducts = products.filter(
-        (p) => p.categoryId === deleteTarget.id,
-      );
-      if (categoryProducts.length > 0) {
-        toast({
-          title: "Error",
-          description:
-            "No puedes eliminar una categoria con productos. Elimina o mueve los productos primero.",
-          variant: "destructive",
-        });
-        setShowDeleteDialog(false);
-        return;
+    try {
+      if (deleteTarget.type === "category") {
+        const categoryProducts = products.filter(
+          (p) => p.categoryId === deleteTarget.id,
+        );
+        if (categoryProducts.length > 0) {
+          toast({
+            title: "Error",
+            description:
+              "No puedes eliminar una categoria con productos. Elimina o mueve los productos primero.",
+            variant: "destructive",
+          });
+          setShowDeleteDialog(false);
+          return;
+        }
+        await deleteCategory(deleteTarget.id);
+        toast({ title: "Categoria eliminada" });
+      } else {
+        await deleteProduct(deleteTarget.id);
+        toast({ title: "Producto eliminado" });
       }
-      deleteCategory(deleteTarget.id);
-      toast({ title: "Categoria eliminada" });
-    } else {
-      deleteProduct(deleteTarget.id);
-      toast({ title: "Producto eliminado" });
-    }
 
-    setShowDeleteDialog(false);
-    loadData();
+      setShowDeleteDialog(false);
+      await loadData();
+    } catch (error) {
+      console.error("Error deleting:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar",
+        variant: "destructive",
+      });
+    }
   };
 
   const getCategoryName = (categoryId: string) => {

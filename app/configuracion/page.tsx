@@ -34,28 +34,59 @@ export default function ConfiguracionPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const savedConfig = getConfig();
-    setConfig(savedConfig);
+    loadConfig();
   }, []);
+
+  const loadConfig = async () => {
+    try {
+      const savedConfig = await getConfig();
+      setConfig(savedConfig);
+    } catch (error) {
+      console.error("Error loading config:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo cargar la configuración",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleChange = (key: keyof SystemConfig, value: string | number) => {
     setConfig((prev) => ({ ...prev, [key]: value }));
     setHasChanges(true);
   };
 
-  const handleSave = () => {
-    updateConfig(config);
-    setHasChanges(false);
-    toast({
-      title: "Configuración guardada",
-      description: "Los cambios se han guardado correctamente",
-    });
+  const handleSave = async () => {
+    try {
+      await updateConfig(config);
+      setHasChanges(false);
+      toast({
+        title: "Configuración guardada",
+        description: "Los cambios se han guardado correctamente",
+      });
+    } catch (error) {
+      console.error("Error saving config:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo guardar la configuración",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleReset = () => {
-    const savedConfig = getConfig();
-    setConfig(savedConfig);
-    setHasChanges(false);
+  const handleReset = async () => {
+    try {
+      const savedConfig = await getConfig();
+      setConfig(savedConfig);
+      setHasChanges(false);
+    } catch (error) {
+      console.error("Error resetting config:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo restaurar la configuración",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

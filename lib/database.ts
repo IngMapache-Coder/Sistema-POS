@@ -1,4 +1,5 @@
-// Local Database using localStorage for offline functionality
+// Database functions using Supabase
+import { supabase, handleSupabaseError } from './supabase';
 import type {
   Category,
   Product,
@@ -12,740 +13,1351 @@ import type {
   MonthlyStats,
   ProductStats,
   LowStockProduct,
-} from "./types";
-
-const STORAGE_KEYS = {
-  CATEGORIES: "pos_categories",
-  PRODUCTS: "pos_products",
-  EMPLOYEES: "pos_employees",
-  SALES: "pos_sales",
-  EXPENSES: "pos_expenses",
-  EMPLOYEE_PAYMENTS: "pos_employee_payments",
-  DAILY_CLOSURES: "pos_daily_closures",
-  CONFIG: "pos_config",
-  CASH_REGISTER_STATUS: "pos_cash_register_status",
-};
+  SaleItem,
+} from './types';
 
 // Helper functions
-function getFromStorage<T>(key: string, defaultValue: T): T {
-  if (typeof window === "undefined") return defaultValue;
-  const stored = localStorage.getItem(key);
-  return stored ? JSON.parse(stored) : defaultValue;
-}
-
-function saveToStorage<T>(key: string, data: T): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(key, JSON.stringify(data));
-}
-
 function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  return crypto.randomUUID();
 }
 
 export function getTodayDate(): string {
-  return new Date().toISOString().split("T")[0];
+  return new Date().toISOString().split('T')[0];
 }
 
 // Categories
-export function getCategories(): Category[] {
-  return getFromStorage<Category[]>(STORAGE_KEYS.CATEGORIES, []);
+export async function getCategories(): Promise<Category[]> {
+  try {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .order('order', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    handleSupabaseError(error, 'Error al cargar categorías');
+    return [];
+  }
 }
 
-export function saveCategory(
-  category: Omit<Category, "id" | "createdAt">,
-): Category {
-  const categories = getCategories();
-  const newCategory: Category = {
-    ...category,
-    id: generateId(),
-    createdAt: new Date().toISOString(),
-  };
-  categories.push(newCategory);
-  saveToStorage(STORAGE_KEYS.CATEGORIES, categories);
-  return newCategory;
+export async function saveCategory(
+  category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<Category> {
+  try {
+    const newCategory = {
+      ...category,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    const { data, error } = await supabase
+      .from('categories')
+      .insert(newCategory)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return {
+      id: data.id,
+      name: data.name,
+      color: data.color,
+      order: data.order,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+  } catch (error) {
+    handleSupabaseError(error, 'Error al guardar categoría');
+    throw error;
+  }
 }
 
-export function updateCategory(
+export async function updateCategory(
   id: string,
-  updates: Partial<Category>,
-): Category | null {
-  const categories = getCategories();
-  const index = categories.findIndex((c) => c.id === id);
-  if (index === -1) return null;
-  categories[index] = { ...categories[index], ...updates };
-  saveToStorage(STORAGE_KEYS.CATEGORIES, categories);
-  return categories[index];
+  updates: Partial<Category>
+): Promise<Category | null> {
+  try {
+    const { data, error } = await supabase
+      .from('categories')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return {
+      id: data.id,
+      name: data.name,
+      color: data.color,
+      order: data.order,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+  } catch (error) {
+    handleSupabaseError(error, 'Error al actualizar categoría');
+    return null;
+  }
 }
 
-export function deleteCategory(id: string): boolean {
-  const categories = getCategories();
-  const filtered = categories.filter((c) => c.id !== id);
-  if (filtered.length === categories.length) return false;
-  saveToStorage(STORAGE_KEYS.CATEGORIES, filtered);
-  return true;
+export async function deleteCategory(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    handleSupabaseError(error, 'Error al eliminar categoría');
+    return false;
+  }
 }
 
 // Products
-export function getProducts(): Product[] {
-  return getFromStorage<Product[]>(STORAGE_KEYS.PRODUCTS, []);
-}
-
-export function getProductsByCategory(categoryId: string): Product[] {
-  return getProducts().filter((p) => p.categoryId === categoryId && p.isActive);
-}
-
-export function saveProduct(
-  product: Omit<Product, "id" | "createdAt" | "updatedAt">,
-): Product {
-  const products = getProducts();
-  const newProduct: Product = {
-    ...product,
-    id: generateId(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  products.push(newProduct);
-  saveToStorage(STORAGE_KEYS.PRODUCTS, products);
-  return newProduct;
-}
-
-export function updateProduct(
-  id: string,
-  updates: Partial<Product>,
-): Product | null {
-  const products = getProducts();
-  const index = products.findIndex((p) => p.id === id);
-  if (index === -1) return null;
-  products[index] = {
-    ...products[index],
-    ...updates,
-    updatedAt: new Date().toISOString(),
-  };
-  saveToStorage(STORAGE_KEYS.PRODUCTS, products);
-  return products[index];
-}
-
-export function deleteProduct(id: string): boolean {
-  const products = getProducts();
-  const index = products.findIndex((p) => p.id === id);
-  if (index === -1) return false;
-  products[index].isActive = false;
-  saveToStorage(STORAGE_KEYS.PRODUCTS, products);
-  return true;
-}
-
-export function updateProductStock(id: string, quantity: number): boolean {
-  const products = getProducts();
-  const index = products.findIndex((p) => p.id === id);
-  if (index === -1) return false;
-  if (products[index].hasInventoryControl) {
-    products[index].stock = Math.max(0, products[index].stock - quantity);
-    products[index].updatedAt = new Date().toISOString();
-    saveToStorage(STORAGE_KEYS.PRODUCTS, products);
+export async function getProducts(): Promise<Product[]> {
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('is_active', true);
+    
+    if (error) throw error;
+    return (data || []).map(p => ({
+      id: p.id,
+      name: p.name,
+      price: parseFloat(p.price),
+      categoryId: p.category_id,
+      stock: p.stock,
+      minStock: p.min_stock,
+      hasInventoryControl: p.has_inventory_control,
+      isActive: p.is_active,
+      createdAt: p.created_at,
+      updatedAt: p.updated_at,
+    }));
+  } catch (error) {
+    handleSupabaseError(error, 'Error al cargar productos');
+    return [];
   }
-  return true;
+}
+
+export async function getProductsByCategory(categoryId: string): Promise<Product[]> {
+  const products = await getProducts();
+  return products.filter((p) => p.categoryId === categoryId && p.isActive);
+}
+
+export async function saveProduct(
+  product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<Product> {
+  try {
+    const newProduct = {
+      name: product.name,
+      price: product.price,
+      category_id: product.categoryId,
+      stock: product.stock,
+      min_stock: product.minStock,
+      has_inventory_control: product.hasInventoryControl,
+      is_active: product.isActive,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    const { data, error } = await supabase
+      .from('products')
+      .insert(newProduct)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return {
+      id: data.id,
+      name: data.name,
+      price: parseFloat(data.price),
+      categoryId: data.category_id,
+      stock: data.stock,
+      minStock: data.min_stock,
+      hasInventoryControl: data.has_inventory_control,
+      isActive: data.is_active,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+  } catch (error) {
+    handleSupabaseError(error, 'Error al guardar producto');
+    throw error;
+  }
+}
+
+export async function updateProduct(
+  id: string,
+  updates: Partial<Product>
+): Promise<Product | null> {
+  try {
+    const updateData: any = {};
+    
+    if (updates.name !== undefined) updateData.name = updates.name;
+    if (updates.price !== undefined) updateData.price = updates.price;
+    if (updates.categoryId !== undefined) updateData.category_id = updates.categoryId;
+    if (updates.stock !== undefined) updateData.stock = updates.stock;
+    if (updates.minStock !== undefined) updateData.min_stock = updates.minStock;
+    if (updates.hasInventoryControl !== undefined) updateData.has_inventory_control = updates.hasInventoryControl;
+    if (updates.isActive !== undefined) updateData.is_active = updates.isActive;
+    
+    updateData.updated_at = new Date().toISOString();
+    
+    const { data, error } = await supabase
+      .from('products')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return {
+      id: data.id,
+      name: data.name,
+      price: parseFloat(data.price),
+      categoryId: data.category_id,
+      stock: data.stock,
+      minStock: data.min_stock,
+      hasInventoryControl: data.has_inventory_control,
+      isActive: data.is_active,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+  } catch (error) {
+    handleSupabaseError(error, 'Error al actualizar producto');
+    return null;
+  }
+}
+
+export async function deleteProduct(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('products')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    handleSupabaseError(error, 'Error al eliminar producto');
+    return false;
+  }
+}
+
+export async function updateProductStock(id: string, quantity: number): Promise<boolean> {
+  try {
+    // Primero obtenemos el producto actual
+    const { data: product, error: fetchError } = await supabase
+      .from('products')
+      .select('stock, has_inventory_control')
+      .eq('id', id)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    if (product.has_inventory_control) {
+      const newStock = Math.max(0, product.stock - quantity);
+      
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({ 
+          stock: newStock, 
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', id);
+      
+      if (updateError) throw updateError;
+    }
+    
+    return true;
+  } catch (error) {
+    handleSupabaseError(error, 'Error al actualizar stock');
+    return false;
+  }
 }
 
 // Employees
-export function getEmployees(): Employee[] {
-  return getFromStorage<Employee[]>(STORAGE_KEYS.EMPLOYEES, []);
+export async function getEmployees(): Promise<Employee[]> {
+  try {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('*');
+    
+    if (error) throw error;
+    return (data || []).map(e => ({
+      id: e.id,
+      name: e.name,
+      position: e.position,
+      dailyPayBase: parseFloat(e.daily_pay_base),
+      isActive: e.is_active,
+      createdAt: e.created_at,
+    }));
+  } catch (error) {
+    handleSupabaseError(error, 'Error al cargar empleados');
+    return [];
+  }
 }
 
-export function getActiveEmployees(): Employee[] {
-  return getEmployees().filter((e) => e.isActive);
+export async function getActiveEmployees(): Promise<Employee[]> {
+  const employees = await getEmployees();
+  return employees.filter((e) => e.isActive);
 }
 
-export function saveEmployee(
-  employee: Omit<Employee, "id" | "createdAt">,
-): Employee {
-  const employees = getEmployees();
-  const newEmployee: Employee = {
-    ...employee,
-    id: generateId(),
-    createdAt: new Date().toISOString(),
-  };
-  employees.push(newEmployee);
-  saveToStorage(STORAGE_KEYS.EMPLOYEES, employees);
-  return newEmployee;
+export async function saveEmployee(
+  employee: Omit<Employee, 'id' | 'createdAt'>
+): Promise<Employee> {
+  try {
+    const newEmployee = {
+      name: employee.name,
+      position: employee.position,
+      daily_pay_base: employee.dailyPayBase,
+      is_active: employee.isActive,
+      created_at: new Date().toISOString(),
+    };
+    
+    const { data, error } = await supabase
+      .from('employees')
+      .insert(newEmployee)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return {
+      id: data.id,
+      name: data.name,
+      position: data.position,
+      dailyPayBase: parseFloat(data.daily_pay_base),
+      isActive: data.is_active,
+      createdAt: data.created_at,
+    };
+  } catch (error) {
+    handleSupabaseError(error, 'Error al guardar empleado');
+    throw error;
+  }
 }
 
-export function updateEmployee(
+export async function updateEmployee(
   id: string,
-  updates: Partial<Employee>,
-): Employee | null {
-  const employees = getEmployees();
-  const index = employees.findIndex((e) => e.id === id);
-  if (index === -1) return null;
-  employees[index] = { ...employees[index], ...updates };
-  saveToStorage(STORAGE_KEYS.EMPLOYEES, employees);
-  return employees[index];
+  updates: Partial<Employee>
+): Promise<Employee | null> {
+  try {
+    const updateData: any = {};
+    
+    if (updates.name !== undefined) updateData.name = updates.name;
+    if (updates.position !== undefined) updateData.position = updates.position;
+    if (updates.dailyPayBase !== undefined) updateData.daily_pay_base = updates.dailyPayBase;
+    if (updates.isActive !== undefined) updateData.is_active = updates.isActive;
+    
+    const { data, error } = await supabase
+      .from('employees')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return {
+      id: data.id,
+      name: data.name,
+      position: data.position,
+      dailyPayBase: parseFloat(data.daily_pay_base),
+      isActive: data.is_active,
+      createdAt: data.created_at,
+    };
+  } catch (error) {
+    handleSupabaseError(error, 'Error al actualizar empleado');
+    return null;
+  }
 }
 
-export function deleteEmployee(id: string): boolean {
-  const employees = getEmployees();
-  const index = employees.findIndex((e) => e.id === id);
-  if (index === -1) return false;
-  employees[index].isActive = false;
-  saveToStorage(STORAGE_KEYS.EMPLOYEES, employees);
-  return true;
+export async function deleteEmployee(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('employees')
+      .update({ is_active: false })
+      .eq('id', id);
+    
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    handleSupabaseError(error, 'Error al eliminar empleado');
+    return false;
+  }
 }
 
 // Sales
-export function getSales(): Sale[] {
-  return getFromStorage<Sale[]>(STORAGE_KEYS.SALES, []);
+export async function getSales(): Promise<Sale[]> {
+  try {
+    const { data, error } = await supabase
+      .from('sales')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return (data || []).map(s => ({
+      id: s.id,
+      items: s.items,
+      subtotal: parseFloat(s.subtotal),
+      total: parseFloat(s.total),
+      cashAmount: parseFloat(s.cash_amount),
+      transferAmount: parseFloat(s.transfer_amount),
+      cashReceived: parseFloat(s.cash_received),
+      cashReturned: parseFloat(s.cash_returned),
+      paymentMethod: s.payment_method,
+      status: s.status,
+      createdAt: s.created_at,
+      cancelledAt: s.cancelled_at,
+      cancelledBy: s.cancelled_by,
+    }));
+  } catch (error) {
+    handleSupabaseError(error, 'Error al cargar ventas');
+    return [];
+  }
 }
 
-export function getTodaySales(): Sale[] {
-  const today = getTodayDate();
-  return getSales().filter(
-    (s) => s.createdAt.startsWith(today) && s.status === "completed",
-  );
+export async function getTodaySales(): Promise<Sale[]> {
+  try {
+    const today = getTodayDate();
+    const { data, error } = await supabase
+      .from('sales')
+      .select('*')
+      .gte('created_at', `${today}T00:00:00Z`)
+      .lt('created_at', `${today}T23:59:59Z`)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return (data || []).map(s => ({
+      id: s.id,
+      items: s.items,
+      subtotal: parseFloat(s.subtotal),
+      total: parseFloat(s.total),
+      cashAmount: parseFloat(s.cash_amount),
+      transferAmount: parseFloat(s.transfer_amount),
+      cashReceived: parseFloat(s.cash_received),
+      cashReturned: parseFloat(s.cash_returned),
+      paymentMethod: s.payment_method,
+      status: s.status,
+      createdAt: s.created_at,
+      cancelledAt: s.cancelled_at,
+      cancelledBy: s.cancelled_by,
+    }));
+  } catch (error) {
+    handleSupabaseError(error, 'Error al cargar ventas del día');
+    return [];
+  }
 }
 
-export function saveSale(
-  sale: Omit<Sale, "id" | "createdAt" | "status">,
-): Sale | null {
-  // Check if daily closure exists
-  if (hasDailyClosure()) {
+export async function saveSale(
+  sale: Omit<Sale, 'id' | 'createdAt' | 'status'>
+): Promise<Sale | null> {
+  try {
+    // Check if daily closure exists
+    if (await hasDailyClosure()) {
+      return null;
+    }
+    
+    // Calcular cambio devuelto si aplica
+    const cashReturned = sale.cashReceived > sale.cashAmount 
+      ? sale.cashReceived - sale.cashAmount 
+      : 0;
+    
+    const newSale = {
+      items: sale.items,
+      subtotal: sale.subtotal,
+      total: sale.total,
+      cash_amount: sale.cashAmount,
+      transfer_amount: sale.transferAmount,
+      cash_received: sale.cashReceived,
+      cash_returned: cashReturned,
+      payment_method: sale.paymentMethod,
+      status: 'completed',
+      created_at: new Date().toISOString(),
+    };
+    
+    const { data, error } = await supabase
+      .from('sales')
+      .insert(newSale)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    // Update stock for products with inventory control
+    for (const item of sale.items) {
+      await updateProductStock(item.productId, item.quantity);
+    }
+    
+    return {
+      id: data.id,
+      items: data.items,
+      subtotal: parseFloat(data.subtotal),
+      total: parseFloat(data.total),
+      cashAmount: parseFloat(data.cash_amount),
+      transferAmount: parseFloat(data.transfer_amount),
+      cashReceived: parseFloat(data.cash_received),
+      cashReturned: parseFloat(data.cash_returned),
+      paymentMethod: data.payment_method,
+      status: data.status,
+      createdAt: data.created_at,
+    };
+  } catch (error) {
+    handleSupabaseError(error, 'Error al guardar venta');
     return null;
   }
-  
-  const sales = getSales();
-  const newSale: Sale = {
-    ...sale,
-    id: generateId(),
-    status: "completed",
-    createdAt: new Date().toISOString(),
-  };
-  sales.push(newSale);
-  saveToStorage(STORAGE_KEYS.SALES, sales);
-
-  // Update stock for products with inventory control
-  newSale.items.forEach((item) => {
-    updateProductStock(item.productId, item.quantity);
-  });
-
-  return newSale;
 }
 
-export function cancelSale(id: string, cancelledBy: string): Sale | null {
-  const sales = getSales();
-  const index = sales.findIndex((s) => s.id === id);
-  if (index === -1) return null;
-
-  const sale = sales[index];
-  sales[index] = {
-    ...sale,
-    status: "cancelled",
-    cancelledAt: new Date().toISOString(),
-    cancelledBy,
-  };
-  saveToStorage(STORAGE_KEYS.SALES, sales);
-
-  // Restore stock for products with inventory control
-  const products = getProducts();
-  sale.items.forEach((item) => {
-    const productIndex = products.findIndex((p) => p.id === item.productId);
-    if (productIndex !== -1 && products[productIndex].hasInventoryControl) {
-      products[productIndex].stock += item.quantity;
+export async function cancelSale(id: string, cancelledBy: string): Promise<Sale | null> {
+  try {
+    // Primero obtenemos la venta
+    const { data: sale, error: fetchError } = await supabase
+      .from('sales')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    // Actualizamos la venta
+    const { data, error } = await supabase
+      .from('sales')
+      .update({ 
+        status: 'cancelled',
+        cancelled_at: new Date().toISOString(),
+        cancelled_by: cancelledBy,
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    // Restaurar stock para productos con control de inventario
+    const products = await getProducts();
+    const saleItems: SaleItem[] = sale.items;
+    
+    for (const item of saleItems) {
+      const product = products.find(p => p.id === item.productId);
+      if (product && product.hasInventoryControl) {
+        await updateProductStock(item.productId, -item.quantity); // Restar negativo = sumar
+      }
     }
-  });
-  saveToStorage(STORAGE_KEYS.PRODUCTS, products);
-
-  return sales[index];
+    
+    return {
+      id: data.id,
+      items: data.items,
+      subtotal: parseFloat(data.subtotal),
+      total: parseFloat(data.total),
+      cashAmount: parseFloat(data.cash_amount),
+      transferAmount: parseFloat(data.transfer_amount),
+      cashReceived: parseFloat(data.cash_received),
+      cashReturned: parseFloat(data.cash_returned),
+      paymentMethod: data.payment_method,
+      status: data.status,
+      createdAt: data.created_at,
+      cancelledAt: data.cancelled_at,
+      cancelledBy: data.cancelled_by,
+    };
+  } catch (error) {
+    handleSupabaseError(error, 'Error al cancelar venta');
+    return null;
+  }
 }
+
+
 
 // Expenses
-export function getExpenses(): Expense[] {
-  return getFromStorage<Expense[]>(STORAGE_KEYS.EXPENSES, []);
+export async function getExpenses(): Promise<Expense[]> {
+  try {
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return (data || []).map(e => ({
+      id: e.id,
+      description: e.description,
+      amount: parseFloat(e.amount),
+      category: e.category,
+      createdAt: e.created_at,
+    }));
+  } catch (error) {
+    handleSupabaseError(error, 'Error al cargar gastos');
+    return [];
+  }
 }
 
-export function getTodayExpenses(): Expense[] {
-  const today = getTodayDate();
-  return getExpenses().filter((e) => e.createdAt.startsWith(today));
+export async function getTodayExpenses(): Promise<Expense[]> {
+  try {
+    const today = getTodayDate();
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .gte('created_at', `${today}T00:00:00Z`)
+      .lt('created_at', `${today}T23:59:59Z`)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return (data || []).map(e => ({
+      id: e.id,
+      description: e.description,
+      amount: parseFloat(e.amount),
+      category: e.category,
+      createdAt: e.created_at,
+    }));
+  } catch (error) {
+    handleSupabaseError(error, 'Error al cargar gastos del día');
+    return [];
+  }
 }
 
-export function saveExpense(
-  expense: Omit<Expense, "id" | "createdAt">,
-): Expense | null {
-  // Check if daily closure exists
-  if (hasDailyClosure()) {
+export async function saveExpense(
+  expense: Omit<Expense, 'id' | 'createdAt'>
+): Promise<Expense | null> {
+  try {
+    // Check if daily closure exists
+    if (await hasDailyClosure()) {
+      return null;
+    }
+    
+    const newExpense = {
+      description: expense.description,
+      amount: expense.amount,
+      category: expense.category,
+      created_at: new Date().toISOString(),
+    };
+    
+    const { data, error } = await supabase
+      .from('expenses')
+      .insert(newExpense)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return {
+      id: data.id,
+      description: data.description,
+      amount: parseFloat(data.amount),
+      category: data.category,
+      createdAt: data.created_at,
+    };
+  } catch (error) {
+    handleSupabaseError(error, 'Error al guardar gasto');
     return null;
   }
-  const expenses = getExpenses();
-  const newExpense: Expense = {
-    ...expense,
-    id: generateId(),
-    createdAt: new Date().toISOString(),
-  };
-  expenses.push(newExpense);
-  saveToStorage(STORAGE_KEYS.EXPENSES, expenses);
-  return newExpense;
 }
 
-export function deleteExpense(id: string): boolean {
-  const expenses = getExpenses();
-  const filtered = expenses.filter((e) => e.id !== id);
-  if (filtered.length === expenses.length) return false;
-  saveToStorage(STORAGE_KEYS.EXPENSES, filtered);
-  return true;
+export async function deleteExpense(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    handleSupabaseError(error, 'Error al eliminar gasto');
+    return false;
+  }
 }
 
 // Employee Payments
-export function getEmployeePayments(): EmployeePayment[] {
-  return getFromStorage<EmployeePayment[]>(STORAGE_KEYS.EMPLOYEE_PAYMENTS, []);
+export async function getEmployeePayments(): Promise<EmployeePayment[]> {
+  try {
+    const { data, error } = await supabase
+      .from('employee_payments')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return (data || []).map(p => ({
+      id: p.id,
+      employeeId: p.employee_id,
+      employeeName: p.employee_name,
+      position: p.position,
+      baseAmount: parseFloat(p.base_amount),
+      finalAmount: parseFloat(p.final_amount),
+      notes: p.notes,
+      fromCashRegister: p.from_cash_register,
+      createdAt: p.created_at,
+    }));
+  } catch (error) {
+    handleSupabaseError(error, 'Error al cargar pagos de empleados');
+    return [];
+  }
 }
 
-export function getTodayEmployeePayments(): EmployeePayment[] {
-  const today = getTodayDate();
-  return getEmployeePayments().filter((p) => p.createdAt.startsWith(today));
+export async function getTodayEmployeePayments(): Promise<EmployeePayment[]> {
+  try {
+    const today = getTodayDate();
+    const { data, error } = await supabase
+      .from('employee_payments')
+      .select('*')
+      .gte('created_at', `${today}T00:00:00Z`)
+      .lt('created_at', `${today}T23:59:59Z`)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return (data || []).map(p => ({
+      id: p.id,
+      employeeId: p.employee_id,
+      employeeName: p.employee_name,
+      position: p.position,
+      baseAmount: parseFloat(p.base_amount),
+      finalAmount: parseFloat(p.final_amount),
+      notes: p.notes,
+      fromCashRegister: p.from_cash_register,
+      createdAt: p.created_at,
+    }));
+  } catch (error) {
+    handleSupabaseError(error, 'Error al cargar pagos del día');
+    return [];
+  }
 }
 
-export function saveEmployeePayment(
-  payment: Omit<EmployeePayment, "id" | "createdAt">,
-): EmployeePayment | null {
-  // Check if daily closure exists
-  if (hasDailyClosure()) {
+export async function saveEmployeePayment(
+  payment: Omit<EmployeePayment, 'id' | 'createdAt'>
+): Promise<EmployeePayment | null> {
+  try {
+    // Check if daily closure exists
+    if (await hasDailyClosure()) {
+      return null;
+    }
+    
+    const newPayment = {
+      employee_id: payment.employeeId,
+      employee_name: payment.employeeName,
+      position: payment.position,
+      base_amount: payment.baseAmount,
+      final_amount: payment.finalAmount,
+      notes: payment.notes,
+      from_cash_register: payment.fromCashRegister,
+      created_at: new Date().toISOString(),
+    };
+    
+    const { data, error } = await supabase
+      .from('employee_payments')
+      .insert(newPayment)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return {
+      id: data.id,
+      employeeId: data.employee_id,
+      employeeName: data.employee_name,
+      position: data.position,
+      baseAmount: parseFloat(data.base_amount),
+      finalAmount: parseFloat(data.final_amount),
+      notes: data.notes,
+      fromCashRegister: data.from_cash_register,
+      createdAt: data.created_at,
+    };
+  } catch (error) {
+    handleSupabaseError(error, 'Error al guardar pago de empleado');
     return null;
   }
-  const payments = getEmployeePayments();
-  const newPayment: EmployeePayment = {
-    ...payment,
-    id: generateId(),
-    createdAt: new Date().toISOString(),
-  };
-  payments.push(newPayment);
-  saveToStorage(STORAGE_KEYS.EMPLOYEE_PAYMENTS, payments);
-  return newPayment;
+}
+
+export async function deleteEmployeePayment(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('employee_payments')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    handleSupabaseError(error, 'Error al eliminar pago de empleado');
+    return false;
+  }
 }
 
 // Daily Closures
-export function getDailyClosures(): DailyClosure[] {
-  return getFromStorage<DailyClosure[]>(STORAGE_KEYS.DAILY_CLOSURES, []);
-}
-
-export function getLowStockProducts(): LowStockProduct[] {
-  const products = getProducts();
-  return products
-    .filter((p) => p.isActive && p.hasInventoryControl && p.stock <= p.minStock)
-    .map((p) => ({
-      productId: p.id,
-      productName: p.name,
-      currentStock: p.stock,
-      minStock: p.minStock,
-      suggestedOrder: Math.max(p.minStock * 2 - p.stock, p.minStock),
+export async function getDailyClosures(): Promise<DailyClosure[]> {
+  try {
+    const { data, error } = await supabase
+      .from('daily_closures')
+      .select('*')
+      .order('date', { ascending: false });
+    
+    if (error) throw error;
+    return (data || []).map(c => ({
+      id: c.id,
+      date: c.date,
+      sales: c.sales,
+      totalSales: parseFloat(c.total_sales),
+      totalCash: parseFloat(c.total_cash),
+      totalTransfer: parseFloat(c.total_transfer),
+      expenses: c.expenses,
+      totalExpenses: parseFloat(c.total_expenses),
+      employeePayments: c.employee_payments,
+      totalPayments: parseFloat(c.total_payments),
+      lowStockProducts: c.low_stock_products,
+      dailyBase: parseFloat(c.daily_base),
+      createdAt: c.created_at,
     }));
+  } catch (error) {
+    handleSupabaseError(error, 'Error al cargar cierres diarios');
+    return [];
+  }
 }
 
-export function createDailyClosure(): DailyClosure {
-  const closures = getDailyClosures();
-  const today = getTodayDate();
-
-  // Check if closure already exists for today
-  const existingIndex = closures.findIndex((c) => c.date === today);
-  if (existingIndex !== -1) {
-    return closures[existingIndex];
+export async function getLowStockProducts(): Promise<LowStockProduct[]> {
+  try {
+    const products = await getProducts();
+    return products
+      .filter((p) => p.isActive && p.hasInventoryControl && p.stock <= p.minStock)
+      .map((p) => ({
+        productId: p.id,
+        productName: p.name,
+        currentStock: p.stock,
+        minStock: p.minStock,
+        suggestedOrder: Math.max(p.minStock * 2 - p.stock, p.minStock),
+      }));
+  } catch (error) {
+    console.error('Error al cargar productos con stock bajo:', error);
+    return [];
   }
+}
 
-  const todaySales = getTodaySales();
-  const todayExpenses = getTodayExpenses();
-  const todayPayments = getTodayEmployeePayments();
-
-  const totalSales = todaySales.reduce((sum, s) => sum + s.total, 0);
-  const totalCash = todaySales.reduce((sum, s) => sum + s.cashAmount, 0);
-  const totalTransfer = todaySales.reduce(
-    (sum, s) => sum + s.transferAmount,
-    0,
-  );
-  const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const totalPayments = todayPayments.reduce(
-    (sum, p) => sum + p.finalAmount,
-    0,
-  );
-
-  const closure: DailyClosure = {
-    id: generateId(),
-    date: today,
-    sales: todaySales,
-    totalSales,
-    totalCash,
-    totalTransfer,
-    expenses: todayExpenses,
-    totalExpenses,
-    employeePayments: todayPayments,
-    totalPayments,
-    lowStockProducts: getLowStockProducts(),
-    dailyBase: getConfig().dailyBase,
-    createdAt: new Date().toISOString(),
-  };
-
-  closures.push(closure);
-  saveToStorage(STORAGE_KEYS.DAILY_CLOSURES, closures);
-  setCashRegisterStatus("closed");
-  return closure;
+export async function createDailyClosure(): Promise<DailyClosure> {
+  try {
+    const today = getTodayDate();
+    
+    // Check if closure already exists for today
+    const closures = await getDailyClosures();
+    const existingClosure = closures.find((c) => c.date === today);
+    if (existingClosure) {
+      return existingClosure;
+    }
+    
+    const todaySales = await getTodaySales();
+    const todayExpenses = await getTodayExpenses();
+    const todayPayments = await getTodayEmployeePayments();
+    
+    const totalSales = todaySales.reduce((sum, s) => sum + s.total, 0);
+    const totalCash = todaySales.reduce((sum, s) => sum + s.cashAmount, 0);
+    const totalTransfer = todaySales.reduce((sum, s) => sum + s.transferAmount, 0);
+    const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalPayments = todayPayments.reduce((sum, p) => sum + p.finalAmount, 0);
+    
+    const config = await getConfig();
+    const lowStockProducts = await getLowStockProducts();
+    
+    const closure = {
+      date: today,
+      sales: todaySales,
+      total_sales: totalSales,
+      total_cash: totalCash,
+      total_transfer: totalTransfer,
+      expenses: todayExpenses,
+      total_expenses: totalExpenses,
+      employee_payments: todayPayments,
+      total_payments: totalPayments,
+      low_stock_products: lowStockProducts,
+      daily_base: config.dailyBase,
+      created_at: new Date().toISOString(),
+    };
+    
+    const { data, error } = await supabase
+      .from('daily_closures')
+      .insert(closure)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return {
+      id: data.id,
+      date: data.date,
+      sales: data.sales,
+      totalSales: parseFloat(data.total_sales),
+      totalCash: parseFloat(data.total_cash),
+      totalTransfer: parseFloat(data.total_transfer),
+      expenses: data.expenses,
+      totalExpenses: parseFloat(data.total_expenses),
+      employeePayments: data.employee_payments,
+      totalPayments: parseFloat(data.total_payments),
+      lowStockProducts: data.low_stock_products,
+      dailyBase: parseFloat(data.daily_base),
+      createdAt: data.created_at,
+    };
+  } catch (error) {
+    handleSupabaseError(error, 'Error al crear cierre diario');
+    throw error;
+  }
 }
 
 // System Config
-export function getConfig(): SystemConfig {
-  return getFromStorage<SystemConfig>(STORAGE_KEYS.CONFIG, {
-    topN: 10,
-    alertEmail: "",
-    businessName: "Mi Restaurante",
-    businessAddress: "",
-    businessPhone: "",
-    businessNIT: "",
-    dailyBase: 500,
-    reopenPassword: "1234"
-  });
+export async function getConfig(): Promise<SystemConfig> {
+  try {
+    const { data, error } = await supabase
+      .from('system_config')
+      .select('*')
+      .limit(1)
+      .single();
+    
+    if (error) throw error;
+    
+    return {
+      topN: data.top_n,
+      alertEmail: data.alert_email,
+      businessName: data.business_name,
+      businessAddress: data.business_address,
+      businessPhone: data.business_phone,
+      businessNIT: data.business_nit,
+      dailyBase: parseFloat(data.daily_base),
+      reopenPassword: data.reopen_password,
+    };
+  } catch (error) {
+    console.error('Error al cargar configuración, usando valores por defecto:', error);
+    return {
+      topN: 10,
+      alertEmail: '',
+      businessName: 'Mi Restaurante',
+      businessAddress: '',
+      businessPhone: '',
+      businessNIT: '',
+      dailyBase: 500,
+      reopenPassword: '1234',
+    };
+  }
 }
 
-export function updateConfig(updates: Partial<SystemConfig>): SystemConfig {
-  const config = getConfig();
-  const newConfig = { ...config, ...updates };
-  saveToStorage(STORAGE_KEYS.CONFIG, newConfig);
-  return newConfig;
+export async function updateConfig(updates: Partial<SystemConfig>): Promise<SystemConfig> {
+  try {
+    const updateData: any = {};
+    
+    if (updates.topN !== undefined) updateData.top_n = updates.topN;
+    if (updates.alertEmail !== undefined) updateData.alert_email = updates.alertEmail;
+    if (updates.businessName !== undefined) updateData.business_name = updates.businessName;
+    if (updates.businessAddress !== undefined) updateData.business_address = updates.businessAddress;
+    if (updates.businessPhone !== undefined) updateData.business_phone = updates.businessPhone;
+    if (updates.businessNIT !== undefined) updateData.business_nit = updates.businessNIT;
+    if (updates.dailyBase !== undefined) updateData.daily_base = updates.dailyBase;
+    if (updates.reopenPassword !== undefined) updateData.reopen_password = updates.reopenPassword;
+    
+    updateData.updated_at = new Date().toISOString();
+    
+    const { data, error } = await supabase
+      .from('system_config')
+      .update(updateData)
+      .eq('id', '11111111-1111-1111-1111-111111111111')
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return {
+      topN: data.top_n,
+      alertEmail: data.alert_email,
+      businessName: data.business_name,
+      businessAddress: data.business_address,
+      businessPhone: data.business_phone,
+      businessNIT: data.business_nit,
+      dailyBase: parseFloat(data.daily_base),
+      reopenPassword: data.reopen_password,
+    };
+  } catch (error) {
+    handleSupabaseError(error, 'Error al actualizar configuración');
+    throw error;
+  }
 }
 
-export function getDailyStats(days: number = 30): DailyStats[] {
-  const closures = getDailyClosures();
-  const today = getTodayDate();
-  const stats: DailyStats[] = [];
+// Statistics functions
+export async function getDailyStats(days: number = 30): Promise<DailyStats[]> {
+  try {
+    const closures = await getDailyClosures();
+    const today = getTodayDate();
+    const stats: DailyStats[] = [];
+    
+    // Get today's data from memory (not yet in closures)
+    const todaySales = await getTodaySales();
+    const todayExpenses = await getTodayExpenses();
+    const todayPayments = await getTodayEmployeePayments();
+    
+    const todayTotalSales = todaySales.reduce((sum, s) => sum + s.total, 0);
+    const todayTotalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const todayTotalPayments = todayPayments.reduce((sum, p) => sum + p.finalAmount, 0);
+    
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      if (dateStr === today) {
+        // Use today's data from memory
+        stats.push({
+          date: dateStr,
+          totalSales: todayTotalSales,
+          totalExpenses: todayTotalExpenses,
+          totalPayments: todayTotalPayments,
+        });
+      } else {
+        // Use data from closures
+        const closure = closures.find((c) => c.date === dateStr);
+        stats.push({
+          date: dateStr,
+          totalSales: closure?.totalSales || 0,
+          totalExpenses: closure?.totalExpenses || 0,
+          totalPayments: closure?.totalPayments || 0,
+        });
+      }
+    }
+    
+    return stats;
+  } catch (error) {
+    console.error('Error al cargar estadísticas diarias:', error);
+    return [];
+  }
+}
 
-  // Get today's data from memory (not yet in closures)
-  const todaySales = getTodaySales();
-  const todayExpenses = getTodayExpenses();
-  const todayPayments = getTodayEmployeePayments();
-  
-  const todayTotalSales = todaySales.reduce((sum, s) => sum + s.total, 0);
-  const todayTotalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const todayTotalPayments = todayPayments.reduce((sum, p) => sum + p.finalAmount, 0);
-
-  for (let i = days - 1; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split("T")[0];
-
-    if (dateStr === today) {
-      // Use today's data from memory
+export async function getMonthlyStats(months: number = 12): Promise<MonthlyStats[]> {
+  try {
+    const closures = await getDailyClosures();
+    const today = getTodayDate();
+    const currentMonth = today.slice(0, 7); // "YYYY-MM"
+    const stats: MonthlyStats[] = [];
+    
+    // Get today's data from memory
+    const todaySales = await getTodaySales();
+    const todayExpenses = await getTodayExpenses();
+    const todayPayments = await getTodayEmployeePayments();
+    
+    const todayTotalSales = todaySales.reduce((sum, s) => sum + s.total, 0);
+    const todayTotalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const todayTotalPayments = todayPayments.reduce((sum, p) => sum + p.finalAmount, 0);
+    
+    for (let i = months - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      const monthStr = date.toISOString().slice(0, 7);
+      
+      // Filter closures for this month, excluding today if it's current month
+      const monthClosures = closures.filter((c) => 
+        c.date.startsWith(monthStr) && 
+        (monthStr !== currentMonth || c.date !== today)
+      );
+      
+      let monthSales = monthClosures.reduce((sum, c) => sum + c.totalSales, 0);
+      let monthExpenses = monthClosures.reduce((sum, c) => sum + c.totalExpenses, 0);
+      let monthPayments = monthClosures.reduce((sum, c) => sum + c.totalPayments, 0);
+      
+      // Add today's data if it's the current month
+      if (monthStr === currentMonth) {
+        monthSales += todayTotalSales;
+        monthExpenses += todayTotalExpenses;
+        monthPayments += todayTotalPayments;
+      }
+      
       stats.push({
-        date: dateStr,
-        totalSales: todayTotalSales,
-        totalExpenses: todayTotalExpenses,
-        totalPayments: todayTotalPayments,
-      });
-    } else {
-      // Use data from closures
-      const closure = closures.find((c) => c.date === dateStr);
-      stats.push({
-        date: dateStr,
-        totalSales: closure?.totalSales || 0,
-        totalExpenses: closure?.totalExpenses || 0,
-        totalPayments: closure?.totalPayments || 0,
+        month: monthStr,
+        totalSales: monthSales,
+        totalExpenses: monthExpenses,
+        totalPayments: monthPayments,
       });
     }
-  }
-
-  return stats;
-}
-
-export function getMonthlyStats(months: number = 12): MonthlyStats[] {
-  const closures = getDailyClosures();
-  const today = getTodayDate();
-  const currentMonth = today.slice(0, 7); // "YYYY-MM"
-  const stats: MonthlyStats[] = [];
-
-  // Get today's data from memory
-  const todaySales = getTodaySales();
-  const todayExpenses = getTodayExpenses();
-  const todayPayments = getTodayEmployeePayments();
-  
-  const todayTotalSales = todaySales.reduce((sum, s) => sum + s.total, 0);
-  const todayTotalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const todayTotalPayments = todayPayments.reduce((sum, p) => sum + p.finalAmount, 0);
-
-  for (let i = months - 1; i >= 0; i--) {
-    const date = new Date();
-    date.setMonth(date.getMonth() - i);
-    const monthStr = date.toISOString().slice(0, 7);
-
-    // Filter closures for this month, excluding today if it's current month
-    const monthClosures = closures.filter((c) => 
-      c.date.startsWith(monthStr) && 
-      (monthStr !== currentMonth || c.date !== today)
-    );
     
-    let monthSales = monthClosures.reduce((sum, c) => sum + c.totalSales, 0);
-    let monthExpenses = monthClosures.reduce((sum, c) => sum + c.totalExpenses, 0);
-    let monthPayments = monthClosures.reduce((sum, c) => sum + c.totalPayments, 0);
-    
-    // Add today's data if it's the current month
-    if (monthStr === currentMonth) {
-      monthSales += todayTotalSales;
-      monthExpenses += todayTotalExpenses;
-      monthPayments += todayTotalPayments;
-    }
-
-    stats.push({
-      month: monthStr,
-      totalSales: monthSales,
-      totalExpenses: monthExpenses,
-      totalPayments: monthPayments,
-    });
+    return stats;
+  } catch (error) {
+    console.error('Error al cargar estadísticas mensuales:', error);
+    return [];
   }
-
-  return stats;
 }
 
-export function getTopProducts(n: number, period?: string): ProductStats[] {
-  const closures = getDailyClosures();
-  const filteredClosures = period
-    ? closures.filter((c) => c.date.startsWith(period))
-    : closures;
-
-  const productMap = new Map<string, ProductStats>();
-
-  filteredClosures.forEach((closure) => {
-    closure.sales.forEach((sale) => {
-      sale.items.forEach((item) => {
-        const existing = productMap.get(item.productId) || {
-          productId: item.productId,
-          productName: item.productName,
-          totalQuantity: 0,
-          totalRevenue: 0,
-        };
-        existing.totalQuantity += item.quantity;
-        existing.totalRevenue += item.total;
-        productMap.set(item.productId, existing);
-      });
-    });
-  });
-
-  return Array.from(productMap.values())
-    .sort((a, b) => b.totalQuantity - a.totalQuantity)
-    .slice(0, n);
-}
-
-export function getBottomProducts(n: number, period?: string): ProductStats[] {
-  const closures = getDailyClosures();
-  const filteredClosures = period
-    ? closures.filter((c) => c.date.startsWith(period))
-    : closures;
-
-  const productMap = new Map<string, ProductStats>();
-  const products = getProducts().filter((p) => p.isActive);
-
-  // Initialize all active products with zero sales
-  products.forEach((p) => {
-    productMap.set(p.id, {
-      productId: p.id,
-      productName: p.name,
-      totalQuantity: 0,
-      totalRevenue: 0,
-    });
-  });
-
-  // Add actual sales data
-  filteredClosures.forEach((closure) => {
-    closure.sales.forEach((sale) => {
-      sale.items.forEach((item) => {
-        const existing = productMap.get(item.productId);
-        if (existing) {
+export async function getTopProducts(n: number, period?: string): Promise<ProductStats[]> {
+  try {
+    const closures = await getDailyClosures();
+    const filteredClosures = period
+      ? closures.filter((c) => c.date.startsWith(period))
+      : closures;
+    
+    const productMap = new Map<string, ProductStats>();
+    
+    filteredClosures.forEach((closure) => {
+      closure.sales.forEach((sale) => {
+        sale.items.forEach((item: SaleItem) => {
+          const existing = productMap.get(item.productId) || {
+            productId: item.productId,
+            productName: item.productName,
+            totalQuantity: 0,
+            totalRevenue: 0,
+          };
           existing.totalQuantity += item.quantity;
           existing.totalRevenue += item.total;
-        }
+          productMap.set(item.productId, existing);
+        });
       });
     });
-  });
-
-  return Array.from(productMap.values())
-    .sort((a, b) => a.totalQuantity - b.totalQuantity)
-    .slice(0, n);
+    
+    return Array.from(productMap.values())
+      .sort((a, b) => b.totalQuantity - a.totalQuantity)
+      .slice(0, n);
+  } catch (error) {
+    console.error('Error al cargar productos más vendidos:', error);
+    return [];
+  }
 }
+
+export async function getBottomProducts(n: number, period?: string): Promise<ProductStats[]> {
+  try {
+    const closures = await getDailyClosures();
+    const filteredClosures = period
+      ? closures.filter((c) => c.date.startsWith(period))
+      : closures;
+    
+    const productMap = new Map<string, ProductStats>();
+    const products = await getProducts();
+    
+    // Initialize all active products with zero sales
+    products.forEach((p) => {
+      productMap.set(p.id, {
+        productId: p.id,
+        productName: p.name,
+        totalQuantity: 0,
+        totalRevenue: 0,
+      });
+    });
+    
+    // Add actual sales data
+    filteredClosures.forEach((closure) => {
+      closure.sales.forEach((sale) => {
+        sale.items.forEach((item: SaleItem) => {
+          const existing = productMap.get(item.productId);
+          if (existing) {
+            existing.totalQuantity += item.quantity;
+            existing.totalRevenue += item.total;
+          }
+        });
+      });
+    });
+    
+    return Array.from(productMap.values())
+      .sort((a, b) => a.totalQuantity - b.totalQuantity)
+      .slice(0, n);
+  } catch (error) {
+    console.error('Error al cargar productos menos vendidos:', error);
+    return [];
+  }
+}
+
 // NEW FUNCTION: Check if today's closure exists
-export function hasDailyClosure(): boolean {
-  return getCashRegisterStatus() === "closed";
+export async function hasDailyClosure(): Promise<boolean> {
+  try {
+    const today = getTodayDate();
+    const { data, error } = await supabase
+      .from('daily_closures')
+      .select('id')
+      .eq('date', today)
+      .single();
+    
+    // Si no hay error y hay data, existe el cierre
+    return !error && data !== null;
+  } catch (error) {
+    // Si hay error (como ningún registro encontrado), no existe el cierre
+    return false;
+  }
 }
 
 // Initialize with sample data if empty
-export function initializeSampleData(): void {
-  if (getCategories().length > 0) return;
-
-  // Sample categories
-  const categories = [
-    { name: "Pescados", color: "#0ea5e9", order: 1 },
-    { name: "Camarones", color: "#f97316", order: 2 },
-    { name: "Entradas", color: "#22c55e", order: 3 },
-    { name: "Bebidas", color: "#8b5cf6", order: 4 },
-  ];
-
-  const savedCategories = categories.map((c) => saveCategory(c));
-
-  // Sample products
-  const sampleProducts = [
-    {
-      name: "Filete de Pescado",
-      price: 120,
-      categoryId: savedCategories[0].id,
-      stock: 50,
-      minStock: 10,
-      hasInventoryControl: true,
-    },
-    {
-      name: "Pescado Entero",
-      price: 150,
-      categoryId: savedCategories[0].id,
-      stock: 30,
-      minStock: 5,
-      hasInventoryControl: true,
-    },
-    {
-      name: "Ceviche de Pescado",
-      price: 95,
-      categoryId: savedCategories[0].id,
-      stock: 100,
-      minStock: 20,
-      hasInventoryControl: false,
-    },
-    {
-      name: "Camarones al Ajillo",
-      price: 180,
-      categoryId: savedCategories[1].id,
-      stock: 40,
-      minStock: 10,
-      hasInventoryControl: true,
-    },
-    {
-      name: "Camarones Empanizados",
-      price: 160,
-      categoryId: savedCategories[1].id,
-      stock: 45,
-      minStock: 10,
-      hasInventoryControl: true,
-    },
-    {
-      name: "Coctel de Camarones",
-      price: 110,
-      categoryId: savedCategories[1].id,
-      stock: 60,
-      minStock: 15,
-      hasInventoryControl: true,
-    },
-    {
-      name: "Tostadas de Ceviche",
-      price: 45,
-      categoryId: savedCategories[2].id,
-      stock: 200,
-      minStock: 30,
-      hasInventoryControl: false,
-    },
-    {
-      name: "Aguachile",
-      price: 85,
-      categoryId: savedCategories[2].id,
-      stock: 80,
-      minStock: 15,
-      hasInventoryControl: false,
-    },
-    {
-      name: "Agua Fresca",
-      price: 25,
-      categoryId: savedCategories[3].id,
-      stock: 1000,
-      minStock: 50,
-      hasInventoryControl: false,
-    },
-    {
-      name: "Refresco",
-      price: 30,
-      categoryId: savedCategories[3].id,
-      stock: 200,
-      minStock: 30,
-      hasInventoryControl: true,
-    },
-    {
-      name: "Cerveza",
-      price: 35,
-      categoryId: savedCategories[3].id,
-      stock: 150,
-      minStock: 20,
-      hasInventoryControl: true,
-    },
-  ];
-
-  sampleProducts.forEach((p) => saveProduct({ ...p, isActive: true }));
-
-  // Sample employees
-  const employees = [
-    {
-      name: "Juan Pérez",
-      position: "Mesero",
-      dailyPayBase: 300,
-      isActive: true,
-    },
-    {
-      name: "María García",
-      position: "Cocinero",
-      dailyPayBase: 400,
-      isActive: true,
-    },
-    { name: "Pedro López", position: "Bar", dailyPayBase: 350, isActive: true },
-  ];
-
-  employees.forEach((e) => saveEmployee(e));
-}
-
-// NEW FUNCTIONS: Cash register status
-export function getCashRegisterStatus(): "open" | "closed" {
-  const today = getTodayDate();
-  const status = getFromStorage<{date: string, status: "open" | "closed"}>(STORAGE_KEYS.CASH_REGISTER_STATUS, {date: "", status: "open"});
-  
-  // Si es un día nuevo, reiniciar a abierto
-  if (status.date !== today) {
-    setCashRegisterStatus("open");
-    return "open";
+export async function initializeSampleData(): Promise<void> {
+  try {
+    // Check if categories already exist
+    const categories = await getCategories();
+    if (categories.length > 0) return;
+    
+    // Sample categories
+    const sampleCategories = [
+      { name: "Pescados", color: "#0ea5e9", order: 1 },
+      { name: "Camarones", color: "#f97316", order: 2 },
+      { name: "Entradas", color: "#22c55e", order: 3 },
+      { name: "Bebidas", color: "#8b5cf6", order: 4 },
+    ];
+    
+    // Insert categories
+    for (const cat of sampleCategories) {
+      await saveCategory(cat);
+    }
+    
+    // Get saved categories
+    const savedCategories = await getCategories();
+    
+    // Sample products
+    const sampleProducts = [
+      {
+        name: "Filete de Pescado",
+        price: 120,
+        categoryId: savedCategories[0].id,
+        stock: 50,
+        minStock: 10,
+        hasInventoryControl: true,
+        isActive: true,
+      },
+      {
+        name: "Pescado Entero",
+        price: 150,
+        categoryId: savedCategories[0].id,
+        stock: 30,
+        minStock: 5,
+        hasInventoryControl: true,
+        isActive: true,
+      },
+      {
+        name: "Ceviche de Pescado",
+        price: 95,
+        categoryId: savedCategories[0].id,
+        stock: 100,
+        minStock: 20,
+        hasInventoryControl: false,
+        isActive: true,
+      },
+      {
+        name: "Camarones al Ajillo",
+        price: 180,
+        categoryId: savedCategories[1].id,
+        stock: 40,
+        minStock: 10,
+        hasInventoryControl: true,
+        isActive: true,
+      },
+      {
+        name: "Camarones Empanizados",
+        price: 160,
+        categoryId: savedCategories[1].id,
+        stock: 45,
+        minStock: 10,
+        hasInventoryControl: true,
+        isActive: true,
+      },
+      {
+        name: "Coctel de Camarones",
+        price: 110,
+        categoryId: savedCategories[1].id,
+        stock: 60,
+        minStock: 15,
+        hasInventoryControl: true,
+        isActive: true,
+      },
+      {
+        name: "Tostadas de Ceviche",
+        price: 45,
+        categoryId: savedCategories[2].id,
+        stock: 200,
+        minStock: 30,
+        hasInventoryControl: false,
+        isActive: true,
+      },
+      {
+        name: "Aguachile",
+        price: 85,
+        categoryId: savedCategories[2].id,
+        stock: 80,
+        minStock: 15,
+        hasInventoryControl: false,
+        isActive: true,
+      },
+      {
+        name: "Agua Fresca",
+        price: 25,
+        categoryId: savedCategories[3].id,
+        stock: 1000,
+        minStock: 50,
+        hasInventoryControl: false,
+        isActive: true,
+      },
+      {
+        name: "Refresco",
+        price: 30,
+        categoryId: savedCategories[3].id,
+        stock: 200,
+        minStock: 30,
+        hasInventoryControl: true,
+        isActive: true,
+      },
+      {
+        name: "Cerveza",
+        price: 35,
+        categoryId: savedCategories[3].id,
+        stock: 150,
+        minStock: 20,
+        hasInventoryControl: true,
+        isActive: true,
+      },
+    ];
+    
+    // Insert products
+    for (const p of sampleProducts) {
+      await saveProduct(p);
+    }
+    
+    // Sample employees
+    const sampleEmployees = [
+      {
+        name: "Juan Pérez",
+        position: "Mesero",
+        dailyPayBase: 300,
+        isActive: true,
+      },
+      {
+        name: "María García",
+        position: "Cocinero",
+        dailyPayBase: 400,
+        isActive: true,
+      },
+      { 
+        name: "Pedro López", 
+        position: "Bar", 
+        dailyPayBase: 350, 
+        isActive: true 
+      },
+    ];
+    
+    // Insert employees
+    for (const e of sampleEmployees) {
+      await saveEmployee(e);
+    }
+    
+  } catch (error) {
+    console.error('Error al inicializar datos de muestra:', error);
   }
-  
-  return status.status;
 }
 
-export function setCashRegisterStatus(status: "open" | "closed"): void {
-  const today = getTodayDate();
-  saveToStorage(STORAGE_KEYS.CASH_REGISTER_STATUS, {date: today, status});
+export async function getCashRegisterStatus(): Promise<"open" | "closed"> {
+  return (await hasDailyClosure()) ? "closed" : "open";
 }
 
-export function reopenCashRegister(password: string): boolean {
-  const config = getConfig();
-  if (password === config.reopenPassword) {
-    deleteTodayClosure();
-    setCashRegisterStatus("open");
-    return true;
+export async function reopenCashRegister(password: string): Promise<boolean> {
+  try {
+    const config = await getConfig();
+    if (password === config.reopenPassword) {
+      const today = getTodayDate();
+      const { error } = await supabase
+        .from('daily_closures')
+        .delete()
+        .eq('date', today);
+      
+      if (error) throw error;
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error al reabrir caja:', error);
+    return false;
   }
-  return false;
-}
-
-export function deleteTodayClosure(): boolean {
-  const closures = getDailyClosures();
-  const today = getTodayDate();
-  
-  const initialLength = closures.length;
-  const filtered = closures.filter(c => c.date !== today);
-  
-  if (filtered.length === initialLength) {
-    return false; // No closure found for today
-  }
-  
-  saveToStorage(STORAGE_KEYS.DAILY_CLOSURES, filtered);
-  return true;
-}
-
-export function deleteEmployeePayment(id: string): boolean {
-  const payments = getEmployeePayments();
-  const filtered = payments.filter(p => p.id !== id);
-  
-  if (filtered.length === payments.length) {
-    return false; // Payment not found
-  }
-  
-  saveToStorage(STORAGE_KEYS.EMPLOYEE_PAYMENTS, filtered);
-  return true;
 }

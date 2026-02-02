@@ -43,8 +43,10 @@ import {
 
 interface PaymentState {
   method: "cash" | "transfer" | "mixed";
-  cashAmount: number;
-  transferAmount: number;
+  cashAmount: number;           // Parte en efectivo de la venta
+  transferAmount: number;       // Parte por transferencia
+  cashReceived: number;         // Efectivo recibido del cliente
+  cashReturned: number;         // Cambio a devolver
 }
 
 export function POSInterface() {
@@ -55,35 +57,65 @@ export function POSInterface() {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showSalesDialog, setShowSalesDialog] = useState(false);
   const [todaySales, setTodaySales] = useState<Sale[]>([]);
+  const [config, setConfig] = useState<any>({});
   const cartTotal = cart.reduce((sum, item) => sum + item.total, 0);
   const [payment, setPayment] = useState<PaymentState>({
     method: "cash",
     cashAmount: cartTotal,
     transferAmount: 0,
+    cashReceived: cartTotal,
+    cashReturned: 0,
   });
   const [productsTimestamp, setProductsTimestamp] = useState(Date.now());
   const { toast } = useToast();
 
-  const loadData = useCallback(() => {
-    initializeSampleData();
-    const cats = getCategories();
-    setCategories(cats.sort((a, b) => a.order - b.order));
-    if (cats.length > 0 && !selectedCategory) {
-      setSelectedCategory(cats[0].id);
+  const loadData = useCallback(async () => {
+    try {
+      await initializeSampleData();
+      const cats = await getCategories();
+      setCategories(cats.sort((a, b) => a.order - b.order));
+      if (cats.length > 0 && !selectedCategory) {
+        setSelectedCategory(cats[0].id);
+      }
+      
+      const configData = await getConfig();
+      setConfig(configData);
+    } catch (error) {
+      console.error("Error loading data:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos",
+        variant: "destructive",
+      });
     }
-  }, [selectedCategory]);
+  }, [selectedCategory, toast]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
   useEffect(() => {
-    if (selectedCategory) {
-      setProducts(getProductsByCategory(selectedCategory));
-    } else {
-      setProducts(getProducts().filter((p) => p.isActive));
-    }
-  }, [selectedCategory, productsTimestamp]);
+    const loadProducts = async () => {
+      try {
+        if (selectedCategory) {
+          const prods = await getProductsByCategory(selectedCategory);
+          setProducts(prods);
+        } else {
+          const allProds = await getProducts();
+          setProducts(allProds.filter((p) => p.isActive));
+        }
+      } catch (error) {
+        console.error("Error loading products:", error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los productos",
+          variant: "destructive",
+        });
+      }
+    };
+    
+    loadProducts();
+  }, [selectedCategory, productsTimestamp, toast]);
 
   const addToCart = (product: Product) => {
     setCart((prevCart) => {
@@ -154,109 +186,169 @@ export function POSInterface() {
       method: "cash",
       cashAmount: cartTotal,
       transferAmount: 0,
+      cashReceived: cartTotal,
+      cashReturned: 0,
     });
     setShowPaymentDialog(true);
   };
 
   const handlePaymentMethodChange = (method: "cash" | "transfer" | "mixed") => {
+    const newCashReceived = method === "transfer" ? 0 : cartTotal;
+    const newCashReturned = method === "transfer" ? 0 : 0;
+    
     setPayment((prev) => ({
       ...prev,
       method,
-      cashAmount:
-        method === "transfer"
-          ? 0
-          : method === "cash"
-            ? cartTotal
-            : prev.cashAmount,
-      transferAmount:
-        method === "cash"
-          ? 0
-          : method === "transfer"
-            ? cartTotal
-            : prev.transferAmount,
+      cashAmount: method === "transfer" ? 0 : cartTotal,
+      transferAmount: method === "cash" ? 0 : cartTotal,
+      cashReceived: newCashReceived,
+      cashReturned: newCashReturned,
     }));
   };
 
-  const handleCompleteSale = () => {
-    if (hasDailyClosure()) {
-      toast({
-        title: "Cierre de caja realizado",
-        description: "No se pueden registrar ventas después del cierre de caja",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (payment.method === "mixed") {
-      const total = payment.cashAmount + payment.transferAmount;
-      if (Math.abs(total - cartTotal) > 0.01) {
+  const updateCashReceived = (value: number) => {
+    setPayment((prev) => {
+      const cashReceived = Math.max(0, value);
+      const cashReturned = cashReceived > prev.cashAmount 
+        ? cashReceived - prev.cashAmount 
+        : 0;
+      
+      return {
+        ...prev,
+        cashReceived,
+        cashReturned,
+      };
+    });
+  };
+
+  const handleCompleteSale = async () => {
+    try {
+      const isClosed = await hasDailyClosure();
+      if (isClosed) {
         toast({
-          title: "Error en el pago",
-          description: `El total del pago ($${total.toFixed(2)}) no coincide con el total de la venta ($${cartTotal.toFixed(2)})`,
+          title: "Cierre de caja realizado",
+          description: "No se pueden registrar ventas después del cierre de caja",
           variant: "destructive",
         });
         return;
       }
-    }
+      
+      // Validaciones
+      if (payment.method === "mixed") {
+        const totalPayment = payment.cashAmount + payment.transferAmount;
+        if (Math.abs(totalPayment - cartTotal) > 0.01) {
+          toast({
+            title: "Error en el pago",
+            description: `El total del pago ($${totalPayment.toFixed(2)}) no coincide con el total de la venta ($${cartTotal.toFixed(2)})`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
 
-    if (payment.method === "cash" && payment.cashAmount < cartTotal) {
+      if (payment.method === "cash" && payment.cashReceived < payment.cashAmount) {
+        toast({
+          title: "Monto insuficiente",
+          description: `El monto recibido ($${payment.cashReceived.toFixed(2)}) es menor al monto en efectivo ($${payment.cashAmount.toFixed(2)})`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (payment.method === "mixed" && payment.cashReceived < payment.cashAmount) {
+        toast({
+          title: "Monto en efectivo insuficiente",
+          description: `El efectivo recibido ($${payment.cashReceived.toFixed(2)}) es menor a la parte en efectivo ($${payment.cashAmount.toFixed(2)})`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const sale = await saveSale({
+        items: cart,
+        subtotal: cartTotal,
+        total: cartTotal,
+        cashAmount: payment.cashAmount,
+        transferAmount: payment.transferAmount,
+        cashReceived: payment.cashReceived,
+        cashReturned: payment.cashReturned,
+        paymentMethod: payment.method,
+      });
+
+      if (sale) {
+        toast({
+          title: "Venta completada",
+          description: `Venta #${sale.id.slice(-6).toUpperCase()} por $${cartTotal.toFixed(2)}`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudo completar la venta",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      clearCart();
+      setShowPaymentDialog(false);
+      setProductsTimestamp(Date.now());
+    } catch (error) {
+      console.error("Error completing sale:", error);
       toast({
-        title: "Monto insuficiente",
-        description: `El monto recibido ($${payment.cashAmount.toFixed(2)}) es menor al total ($${cartTotal.toFixed(2)})`,
+        title: "Error",
+        description: "No se pudo completar la venta",
         variant: "destructive",
       });
-      return;
     }
-
-    const sale = saveSale({
-      items: cart,
-      subtotal: cartTotal,
-      total: cartTotal,
-      cashAmount:
-        payment.method === "transfer"
-          ? 0
-          : payment.method === "cash"
-            ? cartTotal
-            : payment.cashAmount,
-      transferAmount:
-        payment.method === "cash"
-          ? 0
-          : payment.method === "transfer"
-            ? cartTotal
-            : payment.transferAmount,
-      paymentMethod: payment.method,
-    });
-
-    if (sale) {
-      toast({
-        title: "Venta completada",
-        description: `Venta #${sale.id.slice(-6).toUpperCase()} por $${cartTotal.toFixed(2)}`,
-      });
-    }
-
-    clearCart();
-    setShowPaymentDialog(false);
-    setProductsTimestamp(Date.now());
   };
 
-  const openSalesDialog = () => {
-    setTodaySales(getTodaySales());
-    setShowSalesDialog(true);
+  const openSalesDialog = async () => {
+    try {
+      const sales = await getTodaySales();
+      setTodaySales(sales);
+      setShowSalesDialog(true);
+    } catch (error) {
+      console.error("Error loading today's sales:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las ventas del día",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleCancelSale = (saleId: string) => {
-    const result = cancelSale(saleId, "admin");
-    if (result) {
+  const handleCancelSale = async (saleId: string) => {
+    try {
+      const isClosed = await hasDailyClosure();
+      if (isClosed) {
+        toast({
+          title: "Caja cerrada",
+          description: "No se pueden anular ventas con caja cerrada",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const result = await cancelSale(saleId, "admin");
+      if (result) {
+        toast({
+          title: "Venta anulada",
+          description: `La venta #${saleId.slice(-6).toUpperCase()} ha sido anulada`,
+        });
+        const updatedSales = await getTodaySales();
+        setTodaySales(updatedSales);
+      }
+    } catch (error) {
+      console.error("Error cancelling sale:", error);
       toast({
-        title: "Venta anulada",
-        description: `La venta #${saleId.slice(-6).toUpperCase()} ha sido anulada`,
+        title: "Error",
+        description: "No se pudo anular la venta",
+        variant: "destructive",
       });
-      setTodaySales(getTodaySales());
     }
   };
 
   const printTicket = (sale: Sale) => {
-    const config = getConfig();
-
     const printWindow = window.open("", "_blank", "width=300,height=600");
     if (printWindow) {
       printWindow.document.write(`
@@ -287,12 +379,12 @@ export function POSInterface() {
               margin-bottom: 3px;
               color: #555;
             }
-              .business-nit {
-          font-size: 10px;
-          margin-bottom: 3px;
-          color: #555;
-          font-weight: bold;
-        }
+            .business-nit {
+              font-size: 10px;
+              margin-bottom: 3px;
+              color: #555;
+              font-weight: bold;
+            }
             .iva-notice {
               font-size: 9px;
               color: #666;
@@ -319,6 +411,17 @@ export function POSInterface() {
             .total { 
               font-weight: bold; 
               font-size: 14px; 
+            }
+            .payment-details {
+              margin-top: 10px;
+              padding: 8px;
+              background: #f5f5f5;
+              border-radius: 4px;
+            }
+            .payment-row {
+              display: flex;
+              justify-content: space-between;
+              margin: 3px 0;
             }
             .footer {
               text-align: center;
@@ -368,28 +471,30 @@ export function POSInterface() {
             <span>$${sale.total.toFixed(2)}</span>
           </div>
           
-          <div class="item">
-            <span>Efectivo:</span>
-            <span>$${sale.cashAmount.toFixed(2)}</span>
-          </div>
-          
-          <div class="item">
-            <span>Transferencia:</span>
-            <span>$${sale.transferAmount.toFixed(2)}</span>
-          </div>
-          
-          ${
-            sale.cashAmount > sale.total
-              ? `
-            <div class="item">
-              <span>Cambio:</span>
-              <span>$${(sale.cashAmount - sale.total).toFixed(2)}</span>
+          <div class="payment-details">
+            <div class="payment-row">
+              <span>Efectivo:</span>
+              <span>$${sale.cashAmount.toFixed(2)}</span>
             </div>
-          `
-              : ""
-          }
-          
-          <div class="line"></div>
+            <div class="payment-row">
+              <span>Transferencia:</span>
+              <span>$${sale.transferAmount.toFixed(2)}</span>
+            </div>
+            ${sale.cashAmount > 0 ? `
+              <div class="payment-row">
+                <span>Recibido:</span>
+                <span>$${sale.cashReceived.toFixed(2)}</span>
+              </div>
+              <div class="payment-row">
+                <span>Cambio:</span>
+                <span>$${sale.cashReturned.toFixed(2)}</span>
+              </div>
+            ` : ''}
+            <div class="payment-row total">
+              <span>Pagado:</span>
+              <span>$${(sale.cashAmount + sale.transferAmount).toFixed(2)}</span>
+            </div>
+          </div>
           
           <div class="footer">
             Gracias por su compra<br>
@@ -641,98 +746,98 @@ export function POSInterface() {
               </RadioGroup>
             </div>
 
-            {payment.method === "mixed" && (
+            {/* Montos por método de pago */}
+            {(payment.method === "mixed" || payment.method === "cash") && (
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cashAmount">Efectivo</Label>
-                  <InputNumber
-                    id="cashPaid"
-                    value={payment.cashAmount}
-                    onChange={(value) => {
-                      setPayment((prev) => ({
-                        ...prev,
-                        cashAmount: value,
-                        transferAmount: Math.max(0, cartTotal - value),
-                      }));
-                    }}
-                    className="text-lg"
-                    placeholder="Ej: 500.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="transferAmount">Transferencia</Label>
-                  <InputNumber
-                    id="transferAmount"
-                    value={payment.transferAmount}
-                    onChange={(value) => {
-                      setPayment((prev) => ({
-                        ...prev,
-                        transferAmount: value,
-                        cashAmount: Math.max(0, cartTotal - value),
-                      }));
-                    }}
-                    className="text-lg"
-                  />
-                </div>
-                <div className="text-sm text-muted-foreground text-center">
-                  Suma: $
-                  {(payment.cashAmount + payment.transferAmount).toFixed(2)}
-                </div>
-              </div>
-            )}
-            {payment.method === "cash" && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cashPaid">Monto Recibido</Label>
-                  <InputNumber
-                    id="cashAmount"
-                    value={payment.cashAmount}
-                    onChange={(value) => {
-                      setPayment((prev) => ({
-                        ...prev,
-                        cashAmount: value,
-                        transferAmount: Math.max(0, cartTotal - value),
-                      }));
-                    }}
-                    className="text-lg"
-                  />
-                </div>
-
-                {payment.cashAmount > 0 && payment.cashAmount !== cartTotal && (
-                  <div
-                    className={`rounded-lg p-4 text-center ${
-                      payment.cashAmount >= cartTotal
-                        ? "bg-success/10 border border-success/20"
-                        : "bg-destructive/10 border border-destructive/20"
-                    }`}
-                  >
-                    <p className="text-sm text-muted-foreground">
-                      Cambio a devolver:
-                    </p>
-                    <p
-                      className={`text-2xl font-bold ${
-                        payment.cashAmount >= cartTotal
-                          ? "text-success"
-                          : "text-destructive"
-                      }`}
-                    >
-                      {payment.cashAmount >= cartTotal
-                        ? `$${(payment.cashAmount - cartTotal).toFixed(2)}`
-                        : `Faltan $${(cartTotal - payment.cashAmount).toFixed(2)}`}
-                    </p>
-                    {payment.cashAmount < cartTotal && (
-                      <p className="text-xs text-destructive mt-1">
-                        El monto recibido es menor al total
-                      </p>
-                    )}
-                  </div>
+                {payment.method === "mixed" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="cashAmount">Monto en Efectivo</Label>
+                      <InputNumber
+                        id="cashAmount"
+                        value={payment.cashAmount}
+                        onChange={(value) => {
+                          setPayment((prev) => ({
+                            ...prev,
+                            cashAmount: value,
+                            transferAmount: Math.max(0, cartTotal - value),
+                          }));
+                        }}
+                        className="text-lg"
+                        placeholder="Ej: 500.00"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="transferAmount">Monto por Transferencia</Label>
+                      <InputNumber
+                        id="transferAmount"
+                        value={payment.transferAmount}
+                        onChange={(value) => {
+                          setPayment((prev) => ({
+                            ...prev,
+                            transferAmount: value,
+                            cashAmount: Math.max(0, cartTotal - value),
+                          }));
+                        }}
+                        className="text-lg"
+                      />
+                    </div>
+                  </>
                 )}
 
-                {payment.cashAmount === cartTotal && (
-                  <div className="rounded-lg bg-secondary/30 p-4 text-center">
-                    <p className="text-sm text-muted-foreground">Pago exacto</p>
-                    <p className="text-lg font-semibold">Sin cambio</p>
-                  </div>
+                {/* Efectivo recibido y cambio */}
+                {payment.cashAmount > 0 && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="cashReceived">Efectivo Recibido</Label>
+                      <InputNumber
+                        id="cashReceived"
+                        value={payment.cashReceived}
+                        onChange={updateCashReceived}
+                        className="text-lg"
+                        placeholder="Ej: 1000.00"
+                      />
+                    </div>
+
+                    {payment.cashReceived > 0 && (
+                      <div
+                        className={`rounded-lg p-4 text-center ${
+                          payment.cashReceived >= payment.cashAmount
+                            ? "bg-success/10 border border-success/20"
+                            : "bg-destructive/10 border border-destructive/20"
+                        }`}
+                      >
+                        <p className="text-sm text-muted-foreground">
+                          {payment.cashReceived >= payment.cashAmount
+                            ? "Cambio a devolver:"
+                            : "Falta recibir:"}
+                        </p>
+                        <p
+                          className={`text-2xl font-bold ${
+                            payment.cashReceived >= payment.cashAmount
+                              ? "text-success"
+                              : "text-destructive"
+                          }`}
+                        >
+                          {payment.cashReceived >= payment.cashAmount
+                            ? `$${payment.cashReturned.toFixed(2)}`
+                            : `$${(payment.cashAmount - payment.cashReceived).toFixed(2)}`}
+                        </p>
+                        {payment.cashReceived < payment.cashAmount && (
+                          <p className="text-xs text-destructive mt-1">
+                            El monto recibido es menor a la parte en efectivo
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {payment.cashReceived === payment.cashAmount && (
+                      <div className="rounded-lg bg-secondary/30 p-4 text-center">
+                        <p className="text-sm text-muted-foreground">Pago exacto</p>
+                        <p className="text-lg font-semibold">Sin cambio</p>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -745,6 +850,34 @@ export function POSInterface() {
                 <p className="text-lg font-semibold">No requiere cambio</p>
               </div>
             )}
+
+            {/* Resumen de pagos */}
+            <div className="rounded-lg bg-secondary/30 p-4 space-y-2">
+              <div className="flex justify-between">
+                <span className="text-sm">Total venta:</span>
+                <span className="font-semibold">${cartTotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm">Efectivo:</span>
+                <span>${payment.cashAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm">Transferencia:</span>
+                <span>${payment.transferAmount.toFixed(2)}</span>
+              </div>
+              {payment.cashAmount > 0 && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Recibido:</span>
+                    <span>${payment.cashReceived.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Cambio:</span>
+                    <span>${payment.cashReturned.toFixed(2)}</span>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           <DialogFooter>
@@ -808,6 +941,16 @@ export function POSInterface() {
                             </p>
                           ))}
                         </div>
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          <p>Efectivo: ${sale.cashAmount.toFixed(2)}</p>
+                          <p>Transferencia: ${sale.transferAmount.toFixed(2)}</p>
+                          {sale.cashAmount > 0 && (
+                            <>
+                              <p>Recibido: ${sale.cashReceived.toFixed(2)}</p>
+                              <p>Cambio: ${sale.cashReturned.toFixed(2)}</p>
+                            </>
+                          )}
+                        </div>
                       </div>
                       <div className="text-right">
                         <p className="text-xl font-bold">
@@ -833,12 +976,7 @@ export function POSInterface() {
                               variant="destructive"
                               size="sm"
                               onClick={() => handleCancelSale(sale.id)}
-                              disabled={hasDailyClosure()}
-                              title={
-                                hasDailyClosure()
-                                  ? "No se pueden anular ventas con caja cerrada"
-                                  : "Anular venta"
-                              }
+                              title="Anular venta"
                             >
                               <Ban className="h-4 w-4" />
                             </Button>

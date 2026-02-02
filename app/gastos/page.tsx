@@ -80,14 +80,28 @@ export default function GastosPage() {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setAllExpenses(
-      getExpenses().sort(
+  const loadData = async () => {
+    try {
+      const [allData, todayData] = await Promise.all([
+        getExpenses(),
+        getTodayExpenses()
+      ]);
+      
+      const sortedAllData = allData.sort(
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      ),
-    );
-    setTodayExpenses(getTodayExpenses());
+      );
+      
+      setAllExpenses(sortedAllData);
+      setTodayExpenses(todayData);
+    } catch (error) {
+      console.error("Error loading expenses:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los gastos",
+        variant: "destructive",
+      });
+    }
   };
 
   const displayedExpenses = viewMode === "today" ? todayExpenses : allExpenses;
@@ -101,41 +115,61 @@ export default function GastosPage() {
     setShowExpenseDialog(true);
   };
 
-  const handleSaveExpense = () => {
-    if (hasDailyClosure()) {
-      toast({
-        title: "Cierre de caja realizado",
-        description: "No se pueden registrar gastos después del cierre de caja",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (!expenseForm.description.trim()) {
+  const handleSaveExpense = async () => {
+    try {
+      const isClosed = await hasDailyClosure();
+      if (isClosed) {
+        toast({
+          title: "Cierre de caja realizado",
+          description: "No se pueden registrar gastos después del cierre de caja",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (!expenseForm.description.trim()) {
+        toast({
+          title: "Error",
+          description: "La descripcion del gasto es requerida",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (expenseForm.amount <= 0) {
+        toast({
+          title: "Error",
+          description: "El monto debe ser mayor a 0",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const savedExpense = await saveExpense(expenseForm);
+      
+      if (savedExpense) {
+        toast({
+          title: "Gasto registrado",
+          description: `Se registro un gasto de $${expenseForm.amount.toFixed(2)} para ${expenseForm.description}`,
+        });
+
+        setShowExpenseDialog(false);
+        await loadData();
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudo registrar el gasto",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error saving expense:", error);
       toast({
         title: "Error",
-        description: "La descripcion del gasto es requerida",
+        description: "No se pudo registrar el gasto",
         variant: "destructive",
       });
-      return;
     }
-
-    if (expenseForm.amount <= 0) {
-      toast({
-        title: "Error",
-        description: "El monto debe ser mayor a 0",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    saveExpense(expenseForm);
-    toast({
-      title: "Gasto registrado",
-      description: `Se registro un gasto de $${expenseForm.amount.toFixed(2)} para ${expenseForm.description}`,
-    });
-
-    setShowExpenseDialog(false);
-    loadData();
   };
 
   const openDeleteDialog = (id: string) => {
@@ -143,12 +177,30 @@ export default function GastosPage() {
     setShowDeleteDialog(true);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteTargetId) return;
-    deleteExpense(deleteTargetId);
-    toast({ title: "Gasto eliminado" });
-    setShowDeleteDialog(false);
-    loadData();
+    
+    try {
+      const success = await deleteExpense(deleteTargetId);
+      if (success) {
+        toast({ title: "Gasto eliminado" });
+        setShowDeleteDialog(false);
+        await loadData();
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudo eliminar el gasto",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error deleting expense:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el gasto",
+        variant: "destructive",
+      });
+    }
   };
 
   const totalToday = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -336,12 +388,7 @@ export default function GastosPage() {
                           size="icon"
                           className="h-8 w-8 text-destructive hover:text-destructive"
                           onClick={() => openDeleteDialog(expense.id)}
-                          disabled={hasDailyClosure()}
-                          title={
-                            hasDailyClosure()
-                              ? "No se pueden eliminar gastos con caja cerrada"
-                              : "Eliminar gasto"
-                          }
+                          title="Eliminar gasto"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

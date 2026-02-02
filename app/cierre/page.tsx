@@ -61,6 +61,8 @@ import {
   Printer,
   CheckCircle,
   Package,
+  Wallet,
+  DollarSign,
 } from "lucide-react";
 
 export default function CierrePage() {
@@ -73,29 +75,55 @@ export default function CierrePage() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showLowStockDialog, setShowLowStockDialog] = useState(false);
   const [todayClosure, setTodayClosure] = useState<DailyClosure | null>(null);
+  const [config, setConfig] = useState<any>({ dailyBase: 0 });
   const { toast } = useToast();
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setTodaySales(getTodaySales());
-    setTodayExpenses(getTodayExpenses());
-    setTodayPayments(getTodayEmployeePayments());
-    setLowStockProducts(getLowStockProducts());
+  const loadData = async () => {
+    try {
+      const [
+        salesData,
+        expensesData,
+        paymentsData,
+        lowStockData,
+        closuresData,
+        configData,
+        closureExists
+      ] = await Promise.all([
+        getTodaySales(),
+        getTodayExpenses(),
+        getTodayEmployeePayments(),
+        getLowStockProducts(),
+        getDailyClosures(),
+        getConfig(),
+        hasDailyClosure()
+      ]);
 
-    // Check if today's closure already exists AND cash register is closed
-    const closures = getDailyClosures();
-    const today = new Date().toISOString().split("T")[0];
-    const existing = closures.find((c) => c.date === today);
-    const isClosed = hasDailyClosure(); // Necesitas importar esta función
+      setTodaySales(salesData);
+      setTodayExpenses(expensesData);
+      setTodayPayments(paymentsData);
+      setLowStockProducts(lowStockData);
+      setConfig(configData);
 
-    // Solo mostrar cierre si existe Y la caja está cerrada
-    if (existing && isClosed) {
-      setTodayClosure(existing);
-    } else {
-      setTodayClosure(null);
+      const today = new Date().toISOString().split("T")[0];
+      const existing = closuresData.find((c) => c.date === today);
+      
+      // Solo mostrar cierre si existe Y la caja está cerrada
+      if (existing && closureExists) {
+        setTodayClosure(existing);
+      } else {
+        setTodayClosure(null);
+      }
+    } catch (error) {
+      console.error("Error loading data:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos",
+        variant: "destructive",
+      });
     }
   };
 
@@ -112,9 +140,20 @@ export default function CierrePage() {
     0,
   );
 
-  const config = getConfig();
+  // Pagos que salieron de caja (nueva lógica)
+  const paymentsFromCashRegister = todayPayments
+    .filter(p => p.fromCashRegister)
+    .reduce((sum, p) => sum + p.finalAmount, 0);
+  
+  // Pagos que NO salieron de caja
+  const paymentsNotFromCashRegister = todayPayments
+    .filter(p => !p.fromCashRegister)
+    .reduce((sum, p) => sum + p.finalAmount, 0);
+
   const dailyBase = config.dailyBase || 0;
-  const expectedCashInRegister = totalCash + dailyBase;
+  
+  // Dinero esperado en caja con nueva lógica
+  const expectedCashInRegister = totalCash + dailyBase - paymentsFromCashRegister;
 
   // Product summary
   const productSummary = todaySales.reduce(
@@ -136,17 +175,27 @@ export default function CierrePage() {
     {} as Record<string, { name: string; quantity: number; total: number }>,
   );
 
-  const handleCloseCash = () => {
-    const closure = createDailyClosure();
-    setTodayClosure(closure);
-    setShowConfirmDialog(false);
+  const handleCloseCash = async () => {
+    try {
+      const closure = await createDailyClosure();
+      setTodayClosure(closure);
+      setShowConfirmDialog(false);
 
-    toast({
-      title: "Cierre de caja completado",
-    });
+      toast({
+        title: "Cierre de caja completado",
+        description: "El cierre se ha registrado correctamente",
+      });
 
-    if (lowStockProducts.length > 0) {
-      setShowLowStockDialog(true);
+      if (lowStockProducts.length > 0) {
+        setShowLowStockDialog(true);
+      }
+    } catch (error) {
+      console.error("Error creating closure:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo completar el cierre de caja",
+        variant: "destructive",
+      });
     }
   };
 
@@ -162,6 +211,7 @@ export default function CierrePage() {
       employeePayments: todayPayments,
       totalPayments,
       lowStockProducts,
+      dailyBase,
     };
 
     // Create CSV content
@@ -180,6 +230,7 @@ export default function CierrePage() {
     csv += "DINERO EN CAJA\n";
     csv += `Base diaria:,$${dailyBase.toFixed(2)}\n`;
     csv += `+ Ventas efectivo:,$${totalCash.toFixed(2)}\n`;
+    csv += `- Pagos empleados (de caja):,$${paymentsFromCashRegister.toFixed(2)}\n`;
     csv += `Total esperado en caja:,$${expectedCashInRegister.toFixed(2)}\n\n`;
 
     csv += "GASTOS\n";
@@ -190,11 +241,12 @@ export default function CierrePage() {
     csv += `\nTOTAL GASTOS,,$${totalExpenses.toFixed(2)}\n\n`;
 
     csv += "PAGOS A EMPLEADOS\n";
-    csv += "Empleado,Puesto,Monto\n";
+    csv += "Empleado,Puesto,Monto,De Caja\n";
     todayPayments.forEach((p) => {
-      csv += `${p.employeeName},${p.position},$${p.finalAmount.toFixed(2)}\n`;
+      csv += `${p.employeeName},${p.position},$${p.finalAmount.toFixed(2)},${p.fromCashRegister ? "SÍ" : "NO"}\n`;
     });
-    csv += `\nTOTAL PAGOS,,$${totalPayments.toFixed(2)}\n\n`;
+    csv += `\nTOTAL PAGOS (de caja),,$${paymentsFromCashRegister.toFixed(2)}\n`;
+    csv += `TOTAL PAGOS (total),,$${totalPayments.toFixed(2)}\n\n`;
 
     // Download file
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -241,11 +293,55 @@ export default function CierrePage() {
               font-style: italic;
               margin: 5px 0;
             }
-              .section { margin: 15px 0; }
-              .section-title { font-weight: bold; border-bottom: 1px dashed #000; padding-bottom: 3px; }
-              .item { display: flex; justify-content: space-between; margin: 3px 0; }
-              .total-line { border-top: 1px dashed #000; margin-top: 5px; padding-top: 5px; font-weight: bold; }
-              .net-income { font-size: 14px; text-align: center; margin-top: 15px; padding: 10px; border: 2px solid #000; }
+            .section { margin: 15px 0; }
+            .section-title { 
+              font-weight: bold; 
+              border-bottom: 1px dashed #000; 
+              padding-bottom: 3px;
+              margin-bottom: 8px;
+            }
+            .item { display: flex; justify-content: space-between; margin: 3px 0; }
+            .sub-item { display: flex; justify-content: space-between; margin: 1px 0 1px 15px; font-size: 10px; color: #555; }
+            .total-line { 
+              border-top: 1px dashed #000; 
+              margin-top: 5px; 
+              padding-top: 5px; 
+              font-weight: bold; 
+            }
+            .cash-register-section {
+              background: #f5f5f5;
+              padding: 8px;
+              border-radius: 4px;
+              margin: 10px 0;
+            }
+            .cash-register-item {
+              display: flex;
+              justify-content: space-between;
+              margin: 2px 0;
+            }
+            .net-income { 
+              font-size: 14px; 
+              text-align: center; 
+              margin-top: 15px; 
+              padding: 10px; 
+              border: 2px solid #000; 
+            }
+            .from-cash-badge {
+              background: #fee2e2;
+              color: #dc2626;
+              font-size: 9px;
+              padding: 1px 4px;
+              border-radius: 3px;
+              margin-left: 5px;
+            }
+            .not-from-cash-badge {
+              background: #dbeafe;
+              color: #1d4ed8;
+              font-size: 9px;
+              padding: 1px 4px;
+              border-radius: 3px;
+              margin-left: 5px;
+            }
             </style>
           </head>
           <body>
@@ -274,7 +370,28 @@ export default function CierrePage() {
                 <div class="item"><span>TOTAL VENTAS</span><span>$${totalSales.toFixed(2)}</span></div>
                 <div class="item"><span>- Efectivo</span><span>$${totalCash.toFixed(2)}</span></div>
                 <div class="item"><span>- Transferencia</span><span>$${totalTransfer.toFixed(2)}</span></div>
-                <div class="item"><span>Dinero en Caja</span><span>$${expectedCashInRegister.toFixed(2)}</span></div>
+              </div>
+            </div>
+
+            <div class="cash-register-section">
+              <div class="section-title">DINERO EN CAJA</div>
+              <div class="cash-register-item">
+                <span>Base diaria:</span>
+                <span>$${dailyBase.toFixed(2)}</span>
+              </div>
+              <div class="cash-register-item">
+                <span>+ Ventas efectivo:</span>
+                <span>+$${totalCash.toFixed(2)}</span>
+              </div>
+              <div class="cash-register-item">
+                <span>- Pagos empleados (de caja):</span>
+                <span>-$${paymentsFromCashRegister.toFixed(2)}</span>
+              </div>
+              <div class="total-line">
+                <div class="item"><span>TOTAL ESPERADO EN CAJA</span><span>$${expectedCashInRegister.toFixed(2)}</span></div>
+              </div>
+              <div style="font-size: 9px; color: #666; margin-top: 5px;">
+                Esta cantidad debe estar físicamente en caja
               </div>
             </div>
 
@@ -304,7 +421,7 @@ export default function CierrePage() {
                   .map(
                     (p) => `
                 <div class="item">
-                  <span>${p.employeeName}</span>
+                  <span>${p.employeeName} ${p.fromCashRegister ? '<span class="from-cash-badge">DE CAJA</span>' : '<span class="not-from-cash-badge">FUERA CAJA</span>'}</span>
                   <span>-$${p.finalAmount.toFixed(2)}</span>
                 </div>
               `,
@@ -312,11 +429,35 @@ export default function CierrePage() {
                   .join("") || "<div>Sin pagos registrados</div>"
               }
               <div class="total-line">
-                <div class="item"><span>TOTAL PAGOS</span><span>-$${totalPayments.toFixed(2)}</span></div>
+                <div class="item"><span>TOTAL PAGOS (de caja)</span><span>-$${paymentsFromCashRegister.toFixed(2)}</span></div>
+                <div class="item"><span>TOTAL PAGOS (total)</span><span>-$${totalPayments.toFixed(2)}</span></div>
               </div>
             </div>
 
-          
+            <div class="section">
+              <div class="section-title">RESUMEN FINAL</div>
+              <div class="item">
+                <span>Ventas totales:</span>
+                <span>$${totalSales.toFixed(2)}</span>
+              </div>
+              <div class="item">
+                <span>- Gastos:</span>
+                <span>-$${totalExpenses.toFixed(2)}</span>
+              </div>
+              <div class="item">
+                <span>- Pagos empleados (total):</span>
+                <span>-$${totalPayments.toFixed(2)}</span>
+              </div>
+              <div class="total-line">
+                <div class="item">
+                  <span>RESULTADO NETO:</span>
+                  <span>$${(totalSales - totalExpenses - totalPayments).toFixed(2)}</span>
+                </div>
+              </div>
+              <div style="font-size: 9px; color: #666; margin-top: 5px;">
+                * Los pagos "fuera de caja" no afectan el dinero físico en caja
+              </div>
+            </div>
           </body>
         </html>
       `);
@@ -403,12 +544,25 @@ export default function CierrePage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-2xl font-bold text-destructive">
-                    -${totalPayments.toFixed(2)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {todayPayments.length} pagos
-                  </p>
+                  <div className="space-y-1">
+                    <p className="text-2xl font-bold text-destructive">
+                      -${totalPayments.toFixed(2)}
+                    </p>
+                    <div className="text-xs text-muted-foreground">
+                      <div className="flex justify-between">
+                        <span>De caja:</span>
+                        <span className="text-destructive font-medium">
+                          -${paymentsFromCashRegister.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Fuera caja:</span>
+                        <span>
+                          -${paymentsNotFromCashRegister.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -435,6 +589,14 @@ export default function CierrePage() {
                         ${totalCash.toFixed(2)}
                       </span>
                     </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">
+                        - Pagos (de caja):
+                      </span>
+                      <span className="text-sm text-destructive">
+                        -${paymentsFromCashRegister.toFixed(2)}
+                      </span>
+                    </div>
                     <Separator className="my-1" />
                     <div className="flex justify-between items-center">
                       <span className="font-semibold">Total esperado:</span>
@@ -444,7 +606,7 @@ export default function CierrePage() {
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Esta cantidad debe estar en caja al final del día
+                    Esta cantidad debe estar físicamente en caja al final del día
                   </p>
                 </CardContent>
               </Card>
@@ -478,6 +640,70 @@ export default function CierrePage() {
                         ${totalTransfer.toFixed(2)}
                       </p>
                     </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Dinero en Caja Detallado */}
+            <Card className="border-success">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-success">
+                  <Wallet className="h-5 w-5" />
+                  Control de Caja Detallado
+                </CardTitle>
+                <CardDescription>
+                  Cálculo del dinero que debe estar físicamente en caja
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-success/5">
+                    <div className="flex items-center gap-2">
+                      <Banknote className="h-4 w-4 text-success" />
+                      <span>Base diaria inicial</span>
+                    </div>
+                    <span className="font-semibold">${dailyBase.toFixed(2)}</span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-success/10">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-success" />
+                      <span>+ Ventas en efectivo</span>
+                    </div>
+                    <span className="font-semibold text-success">
+                      +${totalCash.toFixed(2)}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-destructive/5">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="h-4 w-4 text-destructive" />
+                      <span>- Pagos empleados (de caja)</span>
+                      <Badge variant="outline" className="text-xs bg-destructive/10">
+                        {todayPayments.filter(p => p.fromCashRegister).length} pagos
+                      </Badge>
+                    </div>
+                    <span className="font-semibold text-destructive">
+                      -${paymentsFromCashRegister.toFixed(2)}
+                    </span>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-success/20 border border-success/30">
+                    <div className="flex items-center gap-2">
+                      <Banknote className="h-5 w-5 text-success" />
+                      <span className="font-bold text-lg">Total en caja</span>
+                    </div>
+                    <span className="text-2xl font-bold text-success">
+                      ${expectedCashInRegister.toFixed(2)}
+                    </span>
+                  </div>
+                  
+                  <div className="text-sm text-muted-foreground">
+                    <p>💰 <strong>Nota importante:</strong> Este es el dinero que debe estar físicamente en la caja registradora.</p>
+                    <p>📝 Los pagos "fuera de caja" (${paymentsNotFromCashRegister.toFixed(2)}) no afectan este cálculo.</p>
                   </div>
                 </div>
               </CardContent>
@@ -562,30 +788,81 @@ export default function CierrePage() {
                     No hay pagos registrados
                   </p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {todayPayments.map((payment) => (
                       <div
                         key={payment.id}
-                        className="flex items-center justify-between py-2 border-b last:border-0"
+                        className="flex items-center justify-between p-3 rounded-lg border"
                       >
-                        <div>
-                          <span className="font-medium">
-                            {payment.employeeName}
-                          </span>
-                          <span className="text-sm text-muted-foreground ml-2">
-                            ({payment.position})
-                          </span>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">
+                              {payment.employeeName}
+                            </span>
+                            <Badge 
+                              variant={payment.fromCashRegister ? "destructive" : "outline"}
+                              className={payment.fromCashRegister ? "bg-destructive/10 text-destructive border-destructive/20" : ""}
+                            >
+                              <div className="flex items-center gap-1">
+                                {payment.fromCashRegister ? (
+                                  <Wallet className="h-3 w-3" />
+                                ) : null}
+                                {payment.fromCashRegister ? 'De caja' : 'Fuera caja'}
+                              </div>
+                            </Badge>
+                            <span className="text-sm text-muted-foreground">
+                              ({payment.position})
+                            </span>
+                          </div>
                           {payment.notes && (
-                            <p className="text-xs text-muted-foreground">
-                              {payment.notes}
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Nota: {payment.notes}
                             </p>
                           )}
                         </div>
-                        <span className="font-semibold text-destructive">
-                          -${payment.finalAmount.toFixed(2)}
-                        </span>
+                        <div className="text-right">
+                          <span className="font-semibold text-destructive">
+                            -${payment.finalAmount.toFixed(2)}
+                          </span>
+                          <div className="text-xs text-muted-foreground">
+                            Base: ${payment.baseAmount.toFixed(2)}
+                          </div>
+                        </div>
                       </div>
                     ))}
+                    
+                    {/* Resumen de pagos */}
+                    <div className="mt-4 pt-4 border-t">
+                      <div className="flex justify-between items-center">
+                        <div className="text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <Wallet className="h-3 w-3" />
+                            <span>Total de caja:</span>
+                          </div>
+                        </div>
+                        <span className="font-semibold text-destructive">
+                          -${paymentsFromCashRegister.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center mt-1">
+                        <div className="text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="h-3 w-3" />
+                            <span>Total fuera caja:</span>
+                          </div>
+                        </div>
+                        <span className="font-semibold">
+                          -${paymentsNotFromCashRegister.toFixed(2)}
+                        </span>
+                      </div>
+                      <Separator className="my-2" />
+                      <div className="flex justify-between items-center font-bold">
+                        <span>Total pagos:</span>
+                        <span className="text-lg text-destructive">
+                          -${totalPayments.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -669,9 +946,9 @@ export default function CierrePage() {
                   </CardHeader>
                   <CardContent>
                     <ReopenCashRegisterForm
-                      onReopen={() => {
+                      onReopen={async () => {
                         setTodayClosure(null);
-                        loadData();
+                        await loadData();
                         toast({
                           title: "Caja reabierta",
                           description:
@@ -708,24 +985,42 @@ export default function CierrePage() {
                   </span>
                 </div>
                 <div className="flex justify-between">
+                  <span>Efectivo:</span>
+                  <span className="font-semibold text-success">
+                    ${totalCash.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Transferencia:</span>
+                  <span className="font-semibold text-primary">
+                    ${totalTransfer.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
                   <span>Gastos:</span>
                   <span className="font-semibold text-destructive">
                     -${totalExpenses.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Pagos:</span>
+                  <span>Pagos empleados (total):</span>
                   <span className="font-semibold text-destructive">
                     -${totalPayments.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Dinero en Caja:</span>
-                  <span className="font-semibold text-success">
-                    ${expectedCashInRegister.toFixed(2)}
+                  <span>Pagos de caja:</span>
+                  <span className="font-semibold text-destructive">
+                    -${paymentsFromCashRegister.toFixed(2)}
                   </span>
                 </div>
                 <Separator />
+                <div className="flex justify-between font-bold text-lg">
+                  <span>Dinero esperado en caja:</span>
+                  <span className="text-success">
+                    ${expectedCashInRegister.toFixed(2)}
+                  </span>
+                </div>
               </div>
             </div>
             <AlertDialogFooter>
