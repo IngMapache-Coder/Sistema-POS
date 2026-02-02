@@ -26,7 +26,7 @@ import { useEffect, useState } from "react"
 const navigation = [
   { name: "Ventas", href: "/", icon: ShoppingCart, roles: ["admin", "cashier", "employee"] },
   { name: "Menu", href: "/menu", icon: UtensilsCrossed, roles: ["admin"] },
-  { name: "Empleados", href: "/empleados", icon: Users, roles: ["admin"] },
+  { name: "Empleados", href: "/empleados", icon: Users, roles: ["admin", "cashier"] },
   { name: "Usuarios", href: "/usuarios", icon: Shield, roles: ["admin"] }, // Nueva sección
   { name: "Gastos", href: "/gastos", icon: Wallet, roles: ["admin", "cashier"] },
   { name: "Cierre de Caja", href: "/cierre", icon: Calculator, roles: ["admin", "cashier"] },

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";  // Importamos Switch
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +46,8 @@ import {
   initializeSampleData,
   hasDailyClosure,
   deleteEmployeePayment,
+  getCurrentUser,
+  checkPermission,
 } from "@/lib/database";
 import type { Employee, EmployeePayment } from "@/lib/types";
 import {
@@ -56,6 +58,7 @@ import {
   DollarSign,
   Briefcase,
   Wallet,
+  ShieldAlert,
 } from "lucide-react";
 
 const POSITIONS = [
@@ -81,6 +84,7 @@ export default function EmpleadosPage() {
   const [deletePaymentId, setDeletePaymentId] = useState<string | null>(null);
   const [deletePaymentEmployeeName, setDeletePaymentEmployeeName] =
     useState<string>("");
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const { toast } = useToast();
 
   // Form states
@@ -92,11 +96,13 @@ export default function EmpleadosPage() {
   const [paymentForm, setPaymentForm] = useState({
     amount: 0,
     notes: "",
-    fromCashRegister: true,  // Por defecto sale de caja
+    fromCashRegister: true,
   });
 
   useEffect(() => {
     initializeData();
+    const user = getCurrentUser();
+    setCurrentUser(user);
   }, []);
 
   const initializeData = async () => {
@@ -135,8 +141,23 @@ export default function EmpleadosPage() {
     return todayPayments.find((p) => p.employeeId === employeeId);
   };
 
+  // Helper functions for permissions
+  const isAdmin = () => checkPermission(["admin"]);
+  const canManageEmployees = () => checkPermission(["admin"]);
+  const canRegisterPayments = () => checkPermission(["admin", "cashier"]);
+  const canDeletePayments = () => checkPermission(["admin"]);
+
   // Employee handlers
   const openEmployeeDialog = (employee?: Employee) => {
+    if (!canManageEmployees()) {
+      toast({
+        title: "Permiso denegado",
+        description: "Solo los administradores pueden gestionar empleados",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (employee) {
       setEditingEmployee(employee);
       setEmployeeForm({
@@ -156,6 +177,15 @@ export default function EmpleadosPage() {
   };
 
   const handleSaveEmployee = async () => {
+    if (!canManageEmployees()) {
+      toast({
+        title: "Permiso denegado",
+        description: "Solo los administradores pueden gestionar empleados",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!employeeForm.name.trim()) {
       toast({
         title: "Error",
@@ -197,6 +227,15 @@ export default function EmpleadosPage() {
 
   // Payment handlers
   const openPaymentDialog = (employee: Employee) => {
+    if (!canRegisterPayments()) {
+      toast({
+        title: "Permiso denegado",
+        description: "No tienes permisos para registrar pagos",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const existingPayment = getPaymentForEmployee(employee.id);
     if (existingPayment) {
       toast({
@@ -211,13 +250,13 @@ export default function EmpleadosPage() {
     setPaymentForm({
       amount: employee.dailyPayBase,
       notes: "",
-      fromCashRegister: true,  // Por defecto sale de caja
+      fromCashRegister: true,
     });
     setShowPaymentDialog(true);
   };
 
   const handleSavePayment = async () => {
-    if (!payingEmployee) return;
+    if (!payingEmployee || !canRegisterPayments()) return;
 
     try {
       const isClosed = await hasDailyClosure();
@@ -268,12 +307,21 @@ export default function EmpleadosPage() {
 
   // Delete handlers
   const openDeleteDialog = (id: string) => {
+    if (!canManageEmployees()) {
+      toast({
+        title: "Permiso denegado",
+        description: "Solo los administradores pueden eliminar empleados",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setDeleteTargetId(id);
     setShowDeleteDialog(true);
   };
 
   const handleDelete = async () => {
-    if (!deleteTargetId) return;
+    if (!deleteTargetId || !canManageEmployees()) return;
     
     try {
       await deleteEmployee(deleteTargetId);
@@ -291,13 +339,22 @@ export default function EmpleadosPage() {
   };
 
   const openDeletePaymentDialog = (paymentId: string, employeeName: string) => {
+    if (!canDeletePayments()) {
+      toast({
+        title: "Permiso denegado",
+        description: "Solo los administradores pueden eliminar pagos",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setDeletePaymentId(paymentId);
     setDeletePaymentEmployeeName(employeeName);
     setShowDeletePaymentDialog(true);
   };
 
   const handleDeletePayment = async () => {
-    if (!deletePaymentId) return;
+    if (!deletePaymentId || !canDeletePayments()) return;
 
     try {
       const isClosed = await hasDailyClosure();
@@ -336,18 +393,35 @@ export default function EmpleadosPage() {
     }
   };
 
-  // Calcular totales con la nueva lógica
+  // Calcular totales
   const totalPaymentsToday = todayPayments.reduce((sum, p) => sum + p.finalAmount, 0);
-  
-  // Pagos que salieron de caja (para el cálculo de dinero en caja)
   const paymentsFromCashRegister = todayPayments
     .filter(p => p.fromCashRegister)
     .reduce((sum, p) => sum + p.finalAmount, 0);
-  
-  // Pagos que NO salieron de caja
   const paymentsNotFromCashRegister = todayPayments
     .filter(p => !p.fromCashRegister)
     .reduce((sum, p) => sum + p.finalAmount, 0);
+
+  // Si el usuario es empleado (sin acceso), mostrar mensaje
+  if (currentUser?.role === "employee") {
+    return (
+      <div className="flex h-screen overflow-hidden">
+        <AppSidebar />
+        <main className="flex-1 p-6 overflow-auto flex flex-col items-center justify-center">
+          <div className="text-center max-w-md">
+            <ShieldAlert className="h-16 w-16 text-destructive mx-auto mb-4" />
+            <h2 className="text-2xl font-bold mb-2">Acceso restringido</h2>
+            <p className="text-muted-foreground mb-6">
+              Los empleados no tienen acceso a la gestión de empleados y pagos.
+            </p>
+            <Button onClick={() => window.location.href = "/"}>
+              Volver a Ventas
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -355,15 +429,20 @@ export default function EmpleadosPage() {
       <main className="flex-1 p-6 overflow-auto flex flex-col">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold">Gestion de Empleados</h1>
+            <h1 className="text-2xl font-bold">Gestión de Empleados</h1>
             <p className="text-muted-foreground">
-              Administra empleados y pagos
+              {currentUser?.role === 'cashier' 
+                ? 'Registra pagos a empleados (Cajero)' 
+                : 'Administra empleados y pagos (Administrador)'}
             </p>
           </div>
-          <Button onClick={() => openEmployeeDialog()} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nuevo Empleado
-          </Button>
+          
+          {canManageEmployees() && (
+            <Button onClick={() => openEmployeeDialog()} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nuevo Empleado
+            </Button>
+          )}
         </div>
 
         {/* Summary Cards */}
@@ -461,24 +540,27 @@ export default function EmpleadosPage() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => openEmployeeDialog(employee)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => openDeleteDialog(employee.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      
+                      {canManageEmployees() && (
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => openEmployeeDialog(employee)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => openDeleteDialog(employee.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-4 pt-4 border-t">
@@ -510,31 +592,35 @@ export default function EmpleadosPage() {
                               <span className="text-xs text-muted-foreground">
                                 {payment.fromCashRegister ? 'De caja' : 'Fuera caja'}
                               </span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-5 w-5 text-destructive hover:text-destructive"
-                                onClick={() =>
-                                  openDeletePaymentDialog(
-                                    payment.id,
-                                    employee.name,
-                                  )
-                                }
-                                title="Eliminar pago"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                              {canDeletePayments() && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-5 w-5 text-destructive hover:text-destructive"
+                                  onClick={() =>
+                                    openDeletePaymentDialog(
+                                      payment.id,
+                                      employee.name,
+                                    )
+                                  }
+                                  title="Eliminar pago"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
                             </div>
                           </div>
                         ) : (
-                          <Button
-                            size="sm"
-                            className="gap-1"
-                            onClick={() => openPaymentDialog(employee)}
-                          >
-                            <DollarSign className="h-4 w-4" />
-                            Pagar
-                          </Button>
+                          canRegisterPayments() && (
+                            <Button
+                              size="sm"
+                              className="gap-1"
+                              onClick={() => openPaymentDialog(employee)}
+                            >
+                              <DollarSign className="h-4 w-4" />
+                              Pagar
+                            </Button>
+                          )
                         )}
                       </div>
                       {payment?.notes && (
@@ -582,7 +668,7 @@ export default function EmpleadosPage() {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Employee Dialog */}
+        {/* Employee Dialog - Solo para admin */}
         <Dialog open={showEmployeeDialog} onOpenChange={setShowEmployeeDialog}>
           <DialogContent>
             <DialogHeader>
@@ -658,7 +744,7 @@ export default function EmpleadosPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Payment Dialog */}
+        {/* Payment Dialog - Para admin y cajero */}
         <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
           <DialogContent>
             <DialogHeader>
@@ -720,7 +806,6 @@ export default function EmpleadosPage() {
                   </div>
                 </div>
 
-                {/* Nuevo: Switch para "Salir de caja" */}
                 <div className="flex items-center justify-between rounded-lg border p-4">
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
@@ -760,7 +845,6 @@ export default function EmpleadosPage() {
                   />
                 </div>
 
-                {/* Resumen del pago */}
                 <div className="rounded-lg bg-primary/5 p-4 space-y-2">
                   <p className="text-sm font-medium">Resumen del Pago</p>
                   <div className="flex justify-between">
@@ -804,7 +888,7 @@ export default function EmpleadosPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Delete Confirmation Dialog */}
+        {/* Delete Confirmation Dialog - Solo para admin */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
           <AlertDialogContent>
             <AlertDialogHeader>
