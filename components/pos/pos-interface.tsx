@@ -370,26 +370,21 @@ export function POSInterface() {
               padding-bottom: 8px;
             }
             .business-name {
-              font-size: 14px;
+              font-size: 20px;
               font-weight: bold;
               margin-bottom: 3px;
             }
             .business-info {
-              font-size: 10px;
+              font-size: 14px;
+              font-weight: bold;
               margin-bottom: 3px;
               color: #555;
             }
             .business-nit {
-              font-size: 10px;
+              font-size: 14px;
               margin-bottom: 3px;
               color: #555;
               font-weight: bold;
-            }
-            .iva-notice {
-              font-size: 9px;
-              color: #666;
-              font-style: italic;
-              margin: 5px 0;
             }
             .line { 
               border-top: 1px dashed #000; 
@@ -426,7 +421,8 @@ export function POSInterface() {
             .footer {
               text-align: center;
               margin-top: 15px;
-              font-size: 10px;
+              font-size: 14px;
+              font-weight: bold;
               color: #666;
               border-top: 1px dashed #000;
               padding-top: 8px;
