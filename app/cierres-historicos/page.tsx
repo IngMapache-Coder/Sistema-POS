@@ -39,7 +39,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { getDailyClosures, getConfig } from "@/lib/database";
 import type { DailyClosure } from "@/lib/types";
-import { PrintClosureButton } from "@/components/ui/print-closure-button";
 import {
   Calendar,
   Search,
@@ -53,6 +52,7 @@ import {
   TrendingDown,
   Wallet,
   FileSpreadsheet,
+  Printer,
 } from "lucide-react";
 
 export default function CierresHistoricosPage() {
@@ -66,7 +66,7 @@ export default function CierresHistoricosPage() {
   const [filterMonth, setFilterMonth] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-  const [config, setConfig] = useState<any>({});
+  const [config, setConfig] = useState<any>({ dailyBase: 0 });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -99,7 +99,303 @@ export default function CierresHistoricosPage() {
       });
     }
   };
+  // Añade esta función dentro de tu componente CierresHistoricosPage
+  const printClosureReport = (closure: DailyClosure) => {
+    const printWindow = window.open("", "_blank", "width=400,height=800");
+    if (!printWindow) return;
 
+    const printDate = new Date(closure.date + "T00:00:00").toLocaleDateString(
+      "es-MX",
+      {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      },
+    );
+
+    // Calcular resumen de productos vendidos
+    const productSummary = closure.sales.reduce(
+      (acc, sale) => {
+        sale.items.forEach((item) => {
+          if (acc[item.productId]) {
+            acc[item.productId].quantity += item.quantity;
+            acc[item.productId].total += item.total;
+          } else {
+            acc[item.productId] = {
+              name: item.productName,
+              quantity: item.quantity,
+              total: item.total,
+            };
+          }
+        });
+        return acc;
+      },
+      {} as Record<string, { name: string; quantity: number; total: number }>,
+    );
+
+    // Calcular pagos de caja y fuera de caja
+    const paymentsFromCashRegister = closure.employeePayments
+      .filter((p) => p.fromCashRegister)
+      .reduce((sum, p) => sum + p.finalAmount, 0);
+
+    const paymentsNotFromCashRegister = closure.employeePayments
+      .filter((p) => !p.fromCashRegister)
+      .reduce((sum, p) => sum + p.finalAmount, 0);
+
+    // Calcular dinero esperado en caja
+    const expectedCashInRegister =
+      closure.totalCash + closure.dailyBase - paymentsFromCashRegister;
+
+    printWindow.document.write(`
+    <html>
+      <head>
+        <title>Cierre de Caja - ${closure.date}</title>
+        <style>
+          body { 
+            font-family: monospace; 
+            font-size: 11px; 
+            width: 280px; 
+            margin: 0 auto; 
+            padding: 10px; 
+          }
+          .header { 
+            text-align: center; 
+            margin-bottom: 15px; 
+            border-bottom: 1px dashed #000;
+            padding-bottom: 8px;
+          }
+          .business-name {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 5px;
+          }
+          .business-info {
+            font-size: 10px;
+            margin-bottom: 3px;
+            color: #555;
+          }
+          .business-nit {
+            font-size: 10px;
+            margin-bottom: 3px;
+            color: #555;
+            font-weight: bold;
+          }
+          .section { 
+            margin: 15px 0; 
+          }
+          .section-title { 
+            font-weight: bold; 
+            border-bottom: 1px dashed #000; 
+            padding-bottom: 3px;
+            margin-bottom: 8px;
+          }
+          .item { 
+            display: flex; 
+            justify-content: space-between; 
+            margin: 3px 0; 
+          }
+          .sub-item { 
+            display: flex; 
+            justify-content: space-between; 
+            margin: 1px 0 1px 15px; 
+            font-size: 10px; 
+            color: #555; 
+          }
+          .total-line { 
+            border-top: 1px dashed #000; 
+            margin-top: 5px; 
+            padding-top: 5px; 
+            font-weight: bold; 
+          }
+          .cash-register-section {
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 4px;
+            margin: 10px 0;
+          }
+          .cash-register-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 2px 0;
+          }
+          .from-cash-badge {
+            background: #fee2e2;
+            color: #dc2626;
+            font-size: 9px;
+            padding: 1px 4px;
+            border-radius: 3px;
+            margin-left: 5px;
+          }
+          .not-from-cash-badge {
+            background: #dbeafe;
+            color: #1d4ed8;
+            font-size: 9px;
+            padding: 1px 4px;
+            border-radius: 3px;
+            margin-left: 5px;
+          }
+          .footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 9px;
+            color: #666;
+            border-top: 1px dashed #000;
+            padding-top: 8px;
+          }
+          .warning-text {
+            color: #dc2626;
+            font-size: 9px;
+            font-style: italic;
+            margin-top: 5px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="business-name">${config.businessName || "RESTAURANTE"}</div>
+          ${config.businessAddress ? `<div class="business-info">${config.businessAddress}</div>` : ""}
+          ${config.businessPhone ? `<div class="business-info">Tel: ${config.businessPhone}</div>` : ""}
+          ${config.businessNIT ? `<div class="business-nit">NIT: ${config.businessNIT}</div>` : ""}
+          <div class="business-info">CIERRE DE CAJA</div>
+          <div class="business-info">${printDate}</div>
+          <div class="business-info">Fecha: ${closure.date}</div>
+          <div class="business-info">Hora: ${new Date(closure.createdAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</div>
+        </div>
+
+        <!-- Sección de productos vendidos -->
+        <div class="section">
+          <div class="section-title">PRODUCTOS VENDIDOS</div>
+          ${
+            Object.keys(productSummary).length === 0
+              ? "<div>Sin ventas registradas</div>"
+              : Object.values(productSummary)
+                  .map(
+                    (p) => `
+                  <div class="item">
+                    <span>${p.quantity}x ${p.name}</span>
+                    <span>$${p.total.toFixed(2)}</span>
+                  </div>
+                `,
+                  )
+                  .join("")
+          }
+          <div class="total-line">
+            <div class="item"><span>TOTAL VENTAS</span><span>$${closure.totalSales.toFixed(2)}</span></div>
+            <div class="item"><span>- Efectivo</span><span>$${closure.totalCash.toFixed(2)}</span></div>
+            <div class="item"><span>- Transferencia</span><span>$${closure.totalTransfer.toFixed(2)}</span></div>
+          </div>
+        </div>
+
+        <!-- Dinero en caja -->
+        <div class="cash-register-section">
+          <div class="section-title">DINERO EN CAJA</div>
+          <div class="cash-register-item">
+            <span>Base diaria:</span>
+            <span>$${closure.dailyBase.toFixed(2)}</span>
+          </div>
+          <div class="cash-register-item">
+            <span>+ Ventas efectivo:</span>
+            <span>+$${closure.totalCash.toFixed(2)}</span>
+          </div>
+          <div class="cash-register-item">
+            <span>- Pagos empleados (de caja):</span>
+            <span>-$${paymentsFromCashRegister.toFixed(2)}</span>
+          </div>
+          <div class="total-line">
+            <div class="item"><span>TOTAL ESPERADO EN CAJA</span><span>$${expectedCashInRegister.toFixed(2)}</span></div>
+          </div>
+          <div class="warning-text">
+            Esta cantidad debe estar físicamente en caja
+          </div>
+        </div>
+
+        <!-- Gastos -->
+        <div class="section">
+          <div class="section-title">GASTOS</div>
+          ${
+            closure.expenses.length === 0
+              ? "<div>Sin gastos registrados</div>"
+              : closure.expenses
+                  .map(
+                    (e) => `
+                  <div class="item">
+                    <span>${e.description} ${e.category ? `(${e.category})` : ""}</span>
+                    <span>-$${e.amount.toFixed(2)}</span>
+                  </div>
+                `,
+                  )
+                  .join("")
+          }
+          <div class="total-line">
+            <div class="item"><span>TOTAL GASTOS</span><span>-$${closure.totalExpenses.toFixed(2)}</span></div>
+          </div>
+        </div>
+
+        <!-- Pagos a empleados -->
+        <div class="section">
+          <div class="section-title">PAGOS A EMPLEADOS</div>
+          ${
+            closure.employeePayments.length === 0
+              ? "<div>Sin pagos registrados</div>"
+              : closure.employeePayments
+                  .map(
+                    (p) => `
+                  <div class="item">
+                    <span>${p.employeeName} ${
+                      p.fromCashRegister
+                        ? '<span class="from-cash-badge">DE CAJA</span>'
+                        : '<span class="not-from-cash-badge">FUERA CAJA</span>'
+                    }</span>
+                    <span>-$${p.finalAmount.toFixed(2)}</span>
+                  </div>
+                  ${p.notes ? `<div class="sub-item">Nota: ${p.notes}</div>` : ""}
+                `,
+                  )
+                  .join("")
+          }
+          <div class="total-line">
+            <div class="item"><span>PAGOS (de caja)</span><span>-$${paymentsFromCashRegister.toFixed(2)}</span></div>
+            <div class="item"><span>PAGOS (fuera de caja)</span><span>-$${paymentsNotFromCashRegister.toFixed(2)}</span></div>
+            <div class="item"><span>TOTAL PAGOS</span><span>-$${closure.totalPayments.toFixed(2)}</span></div>
+          </div>
+        </div>
+
+        <!-- Productos con stock bajo -->
+        ${
+          closure.lowStockProducts.length > 0
+            ? `
+          <div class="section">
+            <div class="section-title">PRODUCTOS CON STOCK BAJO</div>
+            ${closure.lowStockProducts
+              .map(
+                (product) => `
+              <div class="item">
+                <span>${product.productName}</span>
+                <span>${product.currentStock}/${product.minStock}</span>
+              </div>
+              <div class="sub-item">
+                <span>Sugerido ordenar:</span>
+                <span>${product.suggestedOrder} unidades</span>
+              </div>
+            `,
+              )
+              .join("")}
+          </div>
+        `
+            : ""
+        }
+
+        <div class="footer">
+          Reporte generado el ${new Date().toLocaleString("es-MX")}<br>
+          Sistema POS Restaurante
+        </div>
+      </body>
+    </html>
+  `);
+    printWindow.document.close();
+    printWindow.print();
+  };
   const filterClosures = () => {
     let filtered = [...closures];
 
@@ -375,19 +671,26 @@ export default function CierresHistoricosPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleViewClosure(closure)}
-                                className="h-8 gap-1"
-                              >
-                                <Eye className="h-3 w-3" />
-                                Ver
-                              </Button>
-                              <PrintClosureButton
-                                closure={closure}
-                                onView={handleViewClosure}
-                              />
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleViewClosure(closure)}
+                                  className="h-8 gap-1"
+                                >
+                                  <Eye className="h-3 w-3" />
+                                  Ver
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => printClosureReport(closure)}
+                                  className="h-8 gap-1"
+                                >
+                                  <Printer className="h-3 w-3" />
+                                  Imprimir
+                                </Button>
+                              </div>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -750,7 +1053,22 @@ export default function CierresHistoricosPage() {
                 Cerrar
               </Button>
               {selectedClosure && (
-                <PrintClosureButton closure={selectedClosure} />
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowDetailDialog(false)}
+                  >
+                    Cerrar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => printClosureReport(selectedClosure)}
+                    className="gap-1"
+                  >
+                    <Printer className="h-4 w-4" />
+                    Imprimir
+                  </Button>
+                </div>
               )}
             </div>
           </DialogContent>
