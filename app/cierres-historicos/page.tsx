@@ -166,21 +166,22 @@ export default function CierresHistoricosPage() {
             padding-bottom: 8px;
           }
           .business-name {
-            font-size: 16px;
-            font-weight: bold;
-            margin-bottom: 5px;
-          }
-          .business-info {
-            font-size: 10px;
-            margin-bottom: 3px;
-            color: #555;
-          }
-          .business-nit {
-            font-size: 10px;
-            margin-bottom: 3px;
-            color: #555;
-            font-weight: bold;
-          }
+              font-size: 20px;
+              font-weight: bold;
+              margin-bottom: 3px;
+            }
+            .business-info {
+              font-size: 14px;
+              font-weight: bold;
+              margin-bottom: 3px;
+              color: #555;
+            }
+            .business-nit {
+              font-size: 14px;
+              margin-bottom: 3px;
+              color: #555;
+              font-weight: bold;
+            }
           .section { 
             margin: 15px 0; 
           }
