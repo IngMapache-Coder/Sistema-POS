@@ -271,27 +271,22 @@ export default function CierrePage() {
             <style>
               body { font-family: monospace; font-size: 11px; width: 280px; margin: 0 auto; padding: 10px; }
               .header { text-align: center; margin-bottom: 15px; }
-              .business-name {
-              font-size: 16px;
+            .business-name {
+              font-size: 20px;
               font-weight: bold;
-              margin-bottom: 5px;
+              margin-bottom: 3px;
             }
             .business-info {
-              font-size: 10px;
+              font-size: 14px;
+              font-weight: bold;
               margin-bottom: 3px;
               color: #555;
             }
             .business-nit {
-              font-size: 10px;
+              font-size: 14px;
               margin-bottom: 3px;
               color: #555;
               font-weight: bold;
-            }
-            .iva-notice {
-              font-size: 9px;
-              color: #666;
-              font-style: italic;
-              margin: 5px 0;
             }
             .section { margin: 15px 0; }
             .section-title { 
