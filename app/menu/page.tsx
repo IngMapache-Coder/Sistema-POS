@@ -130,18 +130,21 @@ export default function MenuPage() {
     try {
       const [categoriesData, productsData] = await Promise.all([
         getCategories(),
-        getProducts()
+        getProducts(),
       ]);
-      
+
       const sortedCategories = categoriesData.sort((a, b) => a.order - b.order);
       const activeProducts = productsData.filter((p) => p.isActive);
-      
+
       setCategories(sortedCategories);
       setProducts(activeProducts);
-      
+
       // Set default category if none selected
       if (sortedCategories.length > 0 && !productForm.categoryId) {
-        setProductForm(prev => ({ ...prev, categoryId: sortedCategories[0].id }));
+        setProductForm((prev) => ({
+          ...prev,
+          categoryId: sortedCategories[0].id,
+        }));
       }
     } catch (error) {
       console.error("Error loading data:", error);
@@ -415,7 +418,10 @@ export default function MenuPage() {
                           </Badge>
                         </div>
                         <p className="text-xl font-bold text-primary">
-                          ${product.price.toFixed(2)}
+                          $
+                          {product.price.toLocaleString("en-US", {
+                            maximumFractionDigits: 0,
+                          })}
                         </p>
                       </div>
 
@@ -638,7 +644,7 @@ export default function MenuPage() {
                     onChange={(value) =>
                       setProductForm((prev) => ({ ...prev, price: value }))
                     }
-                    placeholder="0.00"
+                    placeholder="0"
                   />
                 </div>
                 <div className="space-y-2">

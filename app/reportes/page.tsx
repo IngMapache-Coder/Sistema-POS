@@ -80,20 +80,20 @@ export default function ReportesPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      
+
       // Primero obtenemos la configuración
       const config = await getConfig();
       const currentTopN = config.topN;
       setTopN(currentTopN);
-      
+
       // Luego cargamos todos los datos usando currentTopN
       const [dailyData, monthlyData, topData, bottomData] = await Promise.all([
         getDailyStats(30),
         getMonthlyStats(12),
         getTopProducts(currentTopN, undefined), // undefined = "all"
-        getBottomProducts(currentTopN, undefined)
+        getBottomProducts(currentTopN, undefined),
       ]);
-      
+
       setDailyStats(dailyData);
       setMonthlyStats(monthlyData);
       setTopProducts(topData);
@@ -111,7 +111,7 @@ export default function ReportesPage() {
       const periodFilter = value === "all" ? undefined : value;
       const [topData, bottomData] = await Promise.all([
         getTopProducts(topN, periodFilter),
-        getBottomProducts(topN, periodFilter)
+        getBottomProducts(topN, periodFilter),
       ]);
       setTopProducts(topData);
       setBottomProducts(bottomData);
@@ -208,7 +208,10 @@ export default function ReportesPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-bold text-success">
-                    ${totalSales30Days.toFixed(2)}
+                    $
+                    {totalSales30Days.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}
                   </p>
                 </CardContent>
               </Card>
@@ -221,7 +224,10 @@ export default function ReportesPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-bold text-success">
-                    ${avgDailySales.toFixed(2)}
+                    $
+                    {avgDailySales.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}
                   </p>
                 </CardContent>
               </Card>
@@ -235,7 +241,10 @@ export default function ReportesPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-bold text-success">
-                    ${bestSalesDay.totalSales.toFixed(2)}
+                    $
+                    {bestSalesDay.totalSales.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {formatDisplayDate(bestSalesDay.date)}
@@ -252,7 +261,10 @@ export default function ReportesPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-bold text-destructive">
-                    ${worstSalesDay.totalSales.toFixed(2)}
+                    $
+                    {worstSalesDay.totalSales.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {formatDisplayDate(worstSalesDay.date)}
@@ -306,7 +318,9 @@ export default function ReportesPage() {
                                 borderRadius: "8px",
                               }}
                               formatter={(value: number) => [
-                                `$${value.toFixed(2)}`,
+                                `$${value.toLocaleString("en-US", {
+                                  maximumFractionDigits: 0,
+                                })}`,
                                 undefined,
                               ]}
                             />
@@ -376,7 +390,9 @@ export default function ReportesPage() {
                                 borderRadius: "8px",
                               }}
                               formatter={(value: number) => [
-                                `$${value.toFixed(2)}`,
+                                `$${value.toLocaleString("en-US", {
+                                  maximumFractionDigits: 0,
+                                })}`,
                                 undefined,
                               ]}
                             />
@@ -479,7 +495,10 @@ export default function ReportesPage() {
                             </div>
                           </div>
                           <p className="font-semibold text-success">
-                            ${product.totalRevenue.toFixed(2)}
+                            $
+                            {product.totalRevenue.toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })}
                           </p>
                         </div>
                       ))}
@@ -522,7 +541,10 @@ export default function ReportesPage() {
                             </div>
                           </div>
                           <p className="font-semibold text-muted-foreground">
-                            ${product.totalRevenue.toFixed(2)}
+                            $
+                            {product.totalRevenue.toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })}
                           </p>
                         </div>
                       ))}

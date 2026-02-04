@@ -84,14 +84,14 @@ export default function GastosPage() {
     try {
       const [allData, todayData] = await Promise.all([
         getExpenses(),
-        getTodayExpenses()
+        getTodayExpenses(),
       ]);
-      
+
       const sortedAllData = allData.sort(
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
-      
+
       setAllExpenses(sortedAllData);
       setTodayExpenses(todayData);
     } catch (error) {
@@ -121,12 +121,13 @@ export default function GastosPage() {
       if (isClosed) {
         toast({
           title: "Cierre de caja realizado",
-          description: "No se pueden registrar gastos después del cierre de caja",
+          description:
+            "No se pueden registrar gastos después del cierre de caja",
           variant: "destructive",
         });
         return;
       }
-      
+
       if (!expenseForm.description.trim()) {
         toast({
           title: "Error",
@@ -146,11 +147,16 @@ export default function GastosPage() {
       }
 
       const savedExpense = await saveExpense(expenseForm);
-      
+
       if (savedExpense) {
         toast({
           title: "Gasto registrado",
-          description: `Se registro un gasto de $${expenseForm.amount.toFixed(2)} para ${expenseForm.description}`,
+          description: `Se registro un gasto de $${expenseForm.amount.toLocaleString(
+            "en-US",
+            {
+              maximumFractionDigits: 0,
+            },
+          )} para ${expenseForm.description}`,
         });
 
         setShowExpenseDialog(false);
@@ -179,7 +185,7 @@ export default function GastosPage() {
 
   const handleDelete = async () => {
     if (!deleteTargetId) return;
-    
+
     try {
       const success = await deleteExpense(deleteTargetId);
       if (success) {
@@ -261,7 +267,10 @@ export default function GastosPage() {
               <div className="flex items-center gap-2">
                 <TrendingDown className="h-5 w-5 text-destructive" />
                 <span className="text-2xl font-bold">
-                  ${totalToday.toFixed(2)}
+                  $
+                  {totalToday.toLocaleString("en-US", {
+                    maximumFractionDigits: 0,
+                  })}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
@@ -281,7 +290,10 @@ export default function GastosPage() {
               <div className="flex items-center gap-2">
                 <Wallet className="h-5 w-5 text-primary" />
                 <span className="text-2xl font-bold">
-                  ${totalAll.toFixed(2)}
+                  $
+                  {totalAll.toLocaleString("en-US", {
+                    maximumFractionDigits: 0,
+                  })}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
@@ -381,7 +393,10 @@ export default function GastosPage() {
                       </div>
                       <div className="flex items-center gap-4">
                         <span className="text-xl font-bold text-destructive">
-                          -${expense.amount.toFixed(2)}
+                          -$
+                          {expense.amount.toLocaleString("en-US", {
+                            maximumFractionDigits: 0,
+                          })}
                         </span>
                         <Button
                           variant="ghost"
@@ -431,7 +446,7 @@ export default function GastosPage() {
                     onChange={(value) =>
                       setExpenseForm((prev) => ({ ...prev, amount: value }))
                     }
-                    placeholder="0.00"
+                    placeholder="0"
                   />
                 </div>
                 <div className="space-y-2">

@@ -275,16 +275,33 @@ export default function CierresHistoricosPage() {
                     (p) => `
                   <div class="item">
                     <span>${p.quantity}x ${p.name}</span>
-                    <span>$${p.total.toFixed(2)}</span>
+                    <span>$${p.total.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}</span>
                   </div>
                 `,
                   )
                   .join("")
           }
           <div class="total-line">
-            <div class="item"><span>TOTAL VENTAS</span><span>$${closure.totalSales.toFixed(2)}</span></div>
-            <div class="item"><span>- Efectivo</span><span>$${closure.totalCash.toFixed(2)}</span></div>
-            <div class="item"><span>- Transferencia</span><span>$${closure.totalTransfer.toFixed(2)}</span></div>
+            <div class="item"><span>TOTAL VENTAS</span><span>$${closure.totalSales.toLocaleString(
+              "en-US",
+              {
+                maximumFractionDigits: 0,
+              },
+            )}</span></div>
+            <div class="item"><span>- Efectivo</span><span>$${closure.totalCash.toLocaleString(
+              "en-US",
+              {
+                maximumFractionDigits: 0,
+              },
+            )}</span></div>
+            <div class="item"><span>- Transferencia</span><span>$${closure.totalTransfer.toLocaleString(
+              "en-US",
+              {
+                maximumFractionDigits: 0,
+              },
+            )}</span></div>
           </div>
         </div>
 
@@ -293,18 +310,29 @@ export default function CierresHistoricosPage() {
           <div class="section-title">DINERO EN CAJA</div>
           <div class="cash-register-item">
             <span>Base diaria:</span>
-            <span>$${closure.dailyBase.toFixed(2)}</span>
+            <span>$${closure.dailyBase.toLocaleString("en-US", {
+              maximumFractionDigits: 0,
+            })}</span>
           </div>
           <div class="cash-register-item">
             <span>+ Ventas efectivo:</span>
-            <span>+$${closure.totalCash.toFixed(2)}</span>
+            <span>+$${closure.totalCash.toLocaleString("en-US", {
+              maximumFractionDigits: 0,
+            })}</span>
           </div>
           <div class="cash-register-item">
             <span>- Pagos empleados (de caja):</span>
-            <span>-$${paymentsFromCashRegister.toFixed(2)}</span>
+            <span>-$${paymentsFromCashRegister.toLocaleString("en-US", {
+              maximumFractionDigits: 0,
+            })}</span>
           </div>
           <div class="total-line">
-            <div class="item"><span>TOTAL ESPERADO EN CAJA</span><span>$${expectedCashInRegister.toFixed(2)}</span></div>
+            <div class="item"><span>TOTAL ESPERADO EN CAJA</span><span>$${expectedCashInRegister.toLocaleString(
+              "en-US",
+              {
+                maximumFractionDigits: 0,
+              },
+            )}</span></div>
           </div>
           <div class="warning-text">
             Esta cantidad debe estar físicamente en caja
@@ -322,14 +350,21 @@ export default function CierresHistoricosPage() {
                     (e) => `
                   <div class="item">
                     <span>${e.description} ${e.category ? `(${e.category})` : ""}</span>
-                    <span>-$${e.amount.toFixed(2)}</span>
+                    <span>-$${e.amount.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}</span>
                   </div>
                 `,
                   )
                   .join("")
           }
           <div class="total-line">
-            <div class="item"><span>TOTAL GASTOS</span><span>-$${closure.totalExpenses.toFixed(2)}</span></div>
+            <div class="item"><span>TOTAL GASTOS</span><span>-$${closure.totalExpenses.toLocaleString(
+              "en-US",
+              {
+                maximumFractionDigits: 0,
+              },
+            )}</span></div>
           </div>
         </div>
 
@@ -348,7 +383,9 @@ export default function CierresHistoricosPage() {
                         ? '<span class="from-cash-badge">DE CAJA</span>'
                         : '<span class="not-from-cash-badge">FUERA CAJA</span>'
                     }</span>
-                    <span>-$${p.finalAmount.toFixed(2)}</span>
+                    <span>-$${p.finalAmount.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}</span>
                   </div>
                   ${p.notes ? `<div class="sub-item">Nota: ${p.notes}</div>` : ""}
                 `,
@@ -356,9 +393,24 @@ export default function CierresHistoricosPage() {
                   .join("")
           }
           <div class="total-line">
-            <div class="item"><span>PAGOS (de caja)</span><span>-$${paymentsFromCashRegister.toFixed(2)}</span></div>
-            <div class="item"><span>PAGOS (fuera de caja)</span><span>-$${paymentsNotFromCashRegister.toFixed(2)}</span></div>
-            <div class="item"><span>TOTAL PAGOS</span><span>-$${closure.totalPayments.toFixed(2)}</span></div>
+            <div class="item"><span>PAGOS (de caja)</span><span>-$${paymentsFromCashRegister.toLocaleString(
+              "en-US",
+              {
+                maximumFractionDigits: 0,
+              },
+            )}</span></div>
+            <div class="item"><span>PAGOS (fuera de caja)</span><span>-$${paymentsNotFromCashRegister.toLocaleString(
+              "en-US",
+              {
+                maximumFractionDigits: 0,
+              },
+            )}</span></div>
+            <div class="item"><span>TOTAL PAGOS</span><span>-$${closure.totalPayments.toLocaleString(
+              "en-US",
+              {
+                maximumFractionDigits: 0,
+              },
+            )}</span></div>
           </div>
         </div>
 
@@ -458,7 +510,21 @@ export default function CierresHistoricosPage() {
     closures.forEach((closure) => {
       const netIncome =
         closure.totalSales - closure.totalExpenses - closure.totalPayments;
-      csv += `${closure.date},$${closure.totalSales.toFixed(2)},$${closure.totalCash.toFixed(2)},$${closure.totalTransfer.toFixed(2)},$${closure.totalExpenses.toFixed(2)},$${closure.totalPayments.toFixed(2)},$${closure.dailyBase.toFixed(2)},$${netIncome.toFixed(2)}\n`;
+      csv += `${closure.date},$${closure.totalSales.toLocaleString("en-US", {
+        maximumFractionDigits: 0,
+      })},$${closure.totalCash.toLocaleString("en-US", {
+        maximumFractionDigits: 0,
+      })},$${closure.totalTransfer.toLocaleString("en-US", {
+        maximumFractionDigits: 0,
+      })},$${closure.totalExpenses.toLocaleString("en-US", {
+        maximumFractionDigits: 0,
+      })},$${closure.totalPayments.toLocaleString("en-US", {
+        maximumFractionDigits: 0,
+      })},$${closure.dailyBase.toLocaleString("en-US", {
+        maximumFractionDigits: 0,
+      })},$${netIncome.toLocaleString("en-US", {
+        maximumFractionDigits: 0,
+      })}\n`;
     });
 
     return csv;
@@ -628,7 +694,10 @@ export default function CierresHistoricosPage() {
                           </TableCell>
                           <TableCell>
                             <div className="font-semibold text-success">
-                              ${closure.totalSales.toFixed(2)}
+                              $
+                              {closure.totalSales.toLocaleString("en-US", {
+                                maximumFractionDigits: 0,
+                              })}
                             </div>
                             <div className="text-xs text-muted-foreground">
                               {closure.sales.length} ventas
@@ -637,18 +706,25 @@ export default function CierresHistoricosPage() {
                           <TableCell>
                             <div className="flex items-center gap-1">
                               <DollarSign className="h-3 w-3 text-green-600" />$
-                              {closure.totalCash.toFixed(2)}
+                              {closure.totalCash.toLocaleString("en-US", {
+                                maximumFractionDigits: 0,
+                              })}
                             </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
                               <Wallet className="h-3 w-3 text-blue-600" />$
-                              {closure.totalTransfer.toFixed(2)}
+                              {closure.totalTransfer.toLocaleString("en-US", {
+                                maximumFractionDigits: 0,
+                              })}
                             </div>
                           </TableCell>
                           <TableCell>
                             <div className="font-medium text-destructive">
-                              -${closure.totalExpenses.toFixed(2)}
+                              -$
+                              {closure.totalExpenses.toLocaleString("en-US", {
+                                maximumFractionDigits: 0,
+                              })}
                             </div>
                             <div className="text-xs text-muted-foreground">
                               {closure.expenses.length} gastos
@@ -656,7 +732,10 @@ export default function CierresHistoricosPage() {
                           </TableCell>
                           <TableCell>
                             <div className="font-medium text-destructive">
-                              -${closure.totalPayments.toFixed(2)}
+                              -$
+                              {closure.totalPayments.toLocaleString("en-US", {
+                                maximumFractionDigits: 0,
+                              })}
                             </div>
                             <div className="text-xs text-muted-foreground">
                               {closure.employeePayments.length} pagos
@@ -664,10 +743,16 @@ export default function CierresHistoricosPage() {
                           </TableCell>
                           <TableCell>
                             <div className="font-semibold">
-                              ${cashExpected.toFixed(2)}
+                              $
+                              {cashExpected.toLocaleString("en-US", {
+                                maximumFractionDigits: 0,
+                              })}
                             </div>
                             <div className="text-xs">
-                              Base: ${closure.dailyBase.toFixed(2)}
+                              Base: $
+                              {closure.dailyBase.toLocaleString("en-US", {
+                                maximumFractionDigits: 0,
+                              })}
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
@@ -765,7 +850,13 @@ export default function CierresHistoricosPage() {
                             Ventas Totales
                           </p>
                           <p className="text-2xl font-bold text-success">
-                            ${selectedClosure.totalSales.toFixed(2)}
+                            $
+                            {selectedClosure.totalSales.toLocaleString(
+                              "en-US",
+                              {
+                                maximumFractionDigits: 0,
+                              },
+                            )}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {selectedClosure.sales.length} transacciones
@@ -776,7 +867,10 @@ export default function CierresHistoricosPage() {
                             Efectivo
                           </p>
                           <p className="text-2xl font-bold text-green-600">
-                            ${selectedClosure.totalCash.toFixed(2)}
+                            $
+                            {selectedClosure.totalCash.toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })}
                           </p>
                         </div>
                         <div className="space-y-1">
@@ -784,7 +878,13 @@ export default function CierresHistoricosPage() {
                             Transferencia
                           </p>
                           <p className="text-2xl font-bold text-blue-600">
-                            ${selectedClosure.totalTransfer.toFixed(2)}
+                            $
+                            {selectedClosure.totalTransfer.toLocaleString(
+                              "en-US",
+                              {
+                                maximumFractionDigits: 0,
+                              },
+                            )}
                           </p>
                         </div>
                         <div className="space-y-1">
@@ -806,7 +906,9 @@ export default function CierresHistoricosPage() {
                               selectedClosure.totalSales -
                               selectedClosure.totalExpenses -
                               selectedClosure.totalPayments
-                            ).toFixed(2)}
+                            ).toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })}
                           </p>
                         </div>
                       </div>
@@ -823,7 +925,10 @@ export default function CierresHistoricosPage() {
                         <div className="flex justify-between items-center p-3 rounded-lg bg-secondary/50">
                           <span>Base diaria</span>
                           <span className="font-semibold">
-                            ${selectedClosure.dailyBase.toFixed(2)}
+                            $
+                            {selectedClosure.dailyBase.toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })}
                           </span>
                         </div>
                         <div className="flex justify-between items-center p-3 rounded-lg bg-green-50">
@@ -832,7 +937,10 @@ export default function CierresHistoricosPage() {
                             Ventas en efectivo
                           </span>
                           <span className="font-semibold text-green-600">
-                            +${selectedClosure.totalCash.toFixed(2)}
+                            +$
+                            {selectedClosure.totalCash.toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })}
                           </span>
                         </div>
                         <div className="flex justify-between items-center p-3 rounded-lg bg-red-50">
@@ -845,7 +953,9 @@ export default function CierresHistoricosPage() {
                             {selectedClosure.employeePayments
                               .filter((p) => p.fromCashRegister)
                               .reduce((sum, p) => sum + p.finalAmount, 0)
-                              .toFixed(2)}
+                              .toLocaleString("en-US", {
+                                maximumFractionDigits: 0,
+                              })}
                           </span>
                         </div>
                         <Separator />
@@ -854,7 +964,12 @@ export default function CierresHistoricosPage() {
                             Total esperado en caja
                           </span>
                           <span className="text-2xl font-bold text-success">
-                            ${calculateCashExpected(selectedClosure).toFixed(2)}
+                            $
+                            {calculateCashExpected(
+                              selectedClosure,
+                            ).toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })}
                           </span>
                         </div>
                       </div>
@@ -910,13 +1025,22 @@ export default function CierresHistoricosPage() {
                               </div>
                               <div className="text-right">
                                 <span className="font-semibold">
-                                  ${sale.total.toFixed(2)}
+                                  $
+                                  {sale.total.toLocaleString("en-US", {
+                                    maximumFractionDigits: 0,
+                                  })}
                                 </span>
                                 <div className="text-xs text-muted-foreground">
-                                  Efectivo: ${sale.cashAmount.toFixed(2)}
+                                  Efectivo: $
+                                  {sale.cashAmount.toLocaleString("en-US", {
+                                    maximumFractionDigits: 0,
+                                  })}
                                 </div>
                                 <div className="text-xs text-muted-foreground">
-                                  Transfer: ${sale.transferAmount.toFixed(2)}
+                                  Transfer: $
+                                  {sale.transferAmount.toLocaleString("en-US", {
+                                    maximumFractionDigits: 0,
+                                  })}
                                 </div>
                               </div>
                             </div>
@@ -956,7 +1080,10 @@ export default function CierresHistoricosPage() {
                                   </Badge>
                                 </div>
                                 <span className="font-semibold text-destructive">
-                                  -${expense.amount.toFixed(2)}
+                                  -$
+                                  {expense.amount.toLocaleString("en-US", {
+                                    maximumFractionDigits: 0,
+                                  })}
                                 </span>
                               </div>
                             ))}
@@ -1000,7 +1127,10 @@ export default function CierresHistoricosPage() {
                                   </Badge>
                                 </div>
                                 <span className="font-semibold text-destructive">
-                                  -${payment.finalAmount.toFixed(2)}
+                                  -$
+                                  {payment.finalAmount.toLocaleString("en-US", {
+                                    maximumFractionDigits: 0,
+                                  })}
                                 </span>
                               </div>
                             ))}

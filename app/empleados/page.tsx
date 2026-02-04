@@ -123,7 +123,7 @@ export default function EmpleadosPage() {
     try {
       const [employeesData, paymentsData] = await Promise.all([
         getActiveEmployees(),
-        getTodayEmployeePayments()
+        getTodayEmployeePayments(),
       ]);
       setEmployees(employeesData);
       setTodayPayments(paymentsData);
@@ -240,7 +240,12 @@ export default function EmpleadosPage() {
     if (existingPayment) {
       toast({
         title: "Pago ya registrado",
-        description: `Ya se registro un pago de $${existingPayment.finalAmount.toFixed(2)} para ${employee.name} hoy`,
+        description: `Ya se registro un pago de $${existingPayment.finalAmount.toLocaleString(
+          "en-US",
+          {
+            maximumFractionDigits: 0,
+          },
+        )} para ${employee.name} hoy`,
         variant: "destructive",
       });
       return;
@@ -263,7 +268,8 @@ export default function EmpleadosPage() {
       if (isClosed) {
         toast({
           title: "Cierre de caja realizado",
-          description: "No se pueden registrar pagos después del cierre de caja",
+          description:
+            "No se pueden registrar pagos después del cierre de caja",
           variant: "destructive",
         });
         return;
@@ -290,7 +296,12 @@ export default function EmpleadosPage() {
 
       toast({
         title: "Pago registrado",
-        description: `Se registro un pago de $${paymentForm.amount.toFixed(2)} para ${payingEmployee.name} ${paymentForm.fromCashRegister ? '(salió de caja)' : '(no salió de caja)'}`,
+        description: `Se registro un pago de $${paymentForm.amount.toLocaleString(
+          "en-US",
+          {
+            maximumFractionDigits: 0,
+          },
+        )} para ${payingEmployee.name} ${paymentForm.fromCashRegister ? "(salió de caja)" : "(no salió de caja)"}`,
       });
 
       setShowPaymentDialog(false);
@@ -315,14 +326,14 @@ export default function EmpleadosPage() {
       });
       return;
     }
-    
+
     setDeleteTargetId(id);
     setShowDeleteDialog(true);
   };
 
   const handleDelete = async () => {
     if (!deleteTargetId || !canManageEmployees()) return;
-    
+
     try {
       await deleteEmployee(deleteTargetId);
       toast({ title: "Empleado eliminado" });
@@ -394,12 +405,15 @@ export default function EmpleadosPage() {
   };
 
   // Calcular totales
-  const totalPaymentsToday = todayPayments.reduce((sum, p) => sum + p.finalAmount, 0);
+  const totalPaymentsToday = todayPayments.reduce(
+    (sum, p) => sum + p.finalAmount,
+    0,
+  );
   const paymentsFromCashRegister = todayPayments
-    .filter(p => p.fromCashRegister)
+    .filter((p) => p.fromCashRegister)
     .reduce((sum, p) => sum + p.finalAmount, 0);
   const paymentsNotFromCashRegister = todayPayments
-    .filter(p => !p.fromCashRegister)
+    .filter((p) => !p.fromCashRegister)
     .reduce((sum, p) => sum + p.finalAmount, 0);
 
   // Si el usuario es empleado (sin acceso), mostrar mensaje
@@ -414,7 +428,7 @@ export default function EmpleadosPage() {
             <p className="text-muted-foreground mb-6">
               Los empleados no tienen acceso a la gestión de empleados y pagos.
             </p>
-            <Button onClick={() => window.location.href = "/"}>
+            <Button onClick={() => (window.location.href = "/")}>
               Volver a Ventas
             </Button>
           </div>
@@ -431,12 +445,12 @@ export default function EmpleadosPage() {
           <div>
             <h1 className="text-2xl font-bold">Gestión de Empleados</h1>
             <p className="text-muted-foreground">
-              {currentUser?.role === 'cashier' 
-                ? 'Registra pagos a empleados (Cajero)' 
-                : 'Administra empleados y pagos (Administrador)'}
+              {currentUser?.role === "cashier"
+                ? "Registra pagos a empleados (Cajero)"
+                : "Administra empleados y pagos (Administrador)"}
             </p>
           </div>
-          
+
           {canManageEmployees() && (
             <Button onClick={() => openEmployeeDialog()} className="gap-2">
               <Plus className="h-4 w-4" />
@@ -488,11 +502,14 @@ export default function EmpleadosPage() {
             <CardContent>
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-destructive">
-                  ${paymentsFromCashRegister.toFixed(2)}
+                  $
+                  {paymentsFromCashRegister.toLocaleString("en-US", {
+                    maximumFractionDigits: 0,
+                  })}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                {todayPayments.filter(p => p.fromCashRegister).length} pagos
+                {todayPayments.filter((p) => p.fromCashRegister).length} pagos
               </p>
             </CardContent>
           </Card>
@@ -505,11 +522,17 @@ export default function EmpleadosPage() {
             <CardContent>
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-primary">
-                  ${totalPaymentsToday.toFixed(2)}
+                  $
+                  {totalPaymentsToday.toLocaleString("en-US", {
+                    maximumFractionDigits: 0,
+                  })}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                De caja: ${paymentsFromCashRegister.toFixed(2)}
+                De caja: $
+                {paymentsFromCashRegister.toLocaleString("en-US", {
+                  maximumFractionDigits: 0,
+                })}
               </p>
             </CardContent>
           </Card>
@@ -540,7 +563,7 @@ export default function EmpleadosPage() {
                           </div>
                         </div>
                       </div>
-                      
+
                       {canManageEmployees() && (
                         <div className="flex gap-1">
                           <Button
@@ -570,14 +593,17 @@ export default function EmpleadosPage() {
                             Pago base
                           </p>
                           <p className="font-semibold">
-                            ${employee.dailyPayBase.toFixed(2)}
+                            $
+                            {employee.dailyPayBase.toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })}
                           </p>
                         </div>
                         {payment ? (
                           <div className="flex flex-col items-end gap-1">
                             <Badge
                               variant="outline"
-                              className={`${payment.fromCashRegister ? 'text-destructive border-destructive' : 'text-muted-foreground border-muted-foreground'}`}
+                              className={`${payment.fromCashRegister ? "text-destructive border-destructive" : "text-muted-foreground border-muted-foreground"}`}
                             >
                               <div className="flex items-center gap-1">
                                 {payment.fromCashRegister ? (
@@ -585,12 +611,19 @@ export default function EmpleadosPage() {
                                 ) : (
                                   <DollarSign className="h-3 w-3" />
                                 )}
-                                <span>${payment.finalAmount.toFixed(2)}</span>
+                                <span>
+                                  $
+                                  {payment.finalAmount.toLocaleString("en-US", {
+                                    maximumFractionDigits: 0,
+                                  })}
+                                </span>
                               </div>
                             </Badge>
                             <div className="flex items-center gap-1">
                               <span className="text-xs text-muted-foreground">
-                                {payment.fromCashRegister ? 'De caja' : 'Fuera caja'}
+                                {payment.fromCashRegister
+                                  ? "De caja"
+                                  : "Fuera caja"}
                               </span>
                               {canDeletePayments() && (
                                 <Button
@@ -765,7 +798,10 @@ export default function EmpleadosPage() {
                         {payingEmployee.position}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        Pago base: ${payingEmployee.dailyPayBase.toFixed(2)}
+                        Pago base: $
+                        {payingEmployee.dailyPayBase.toLocaleString("en-US", {
+                          maximumFractionDigits: 0,
+                        })}
                       </p>
                     </div>
                   </div>
@@ -780,11 +816,14 @@ export default function EmpleadosPage() {
                       setPaymentForm((prev) => ({ ...prev, amount: value }))
                     }
                     className="text-lg"
-                    placeholder="0.00"
+                    placeholder="0"
                   />
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
-                      Pago base: ${payingEmployee.dailyPayBase.toFixed(2)}
+                      Pago base: $
+                      {payingEmployee.dailyPayBase.toLocaleString("en-US", {
+                        maximumFractionDigits: 0,
+                      })}
                     </span>
                     {paymentForm.amount !== payingEmployee.dailyPayBase && (
                       <span
@@ -800,7 +839,9 @@ export default function EmpleadosPage() {
                         $
                         {(
                           paymentForm.amount - payingEmployee.dailyPayBase
-                        ).toFixed(2)}
+                        ).toLocaleString("en-US", {
+                          maximumFractionDigits: 0,
+                        })}
                       </span>
                     )}
                   </div>
@@ -852,15 +893,20 @@ export default function EmpleadosPage() {
                       Monto:
                     </span>
                     <span className="font-semibold">
-                      ${paymentForm.amount.toFixed(2)}
+                      $
+                      {paymentForm.amount.toLocaleString("en-US", {
+                        maximumFractionDigits: 0,
+                      })}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">
                       Salir de caja:
                     </span>
-                    <span className={`font-medium ${paymentForm.fromCashRegister ? 'text-destructive' : 'text-success'}`}>
-                      {paymentForm.fromCashRegister ? 'SÍ' : 'NO'}
+                    <span
+                      className={`font-medium ${paymentForm.fromCashRegister ? "text-destructive" : "text-success"}`}
+                    >
+                      {paymentForm.fromCashRegister ? "SÍ" : "NO"}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">

@@ -40,6 +40,7 @@ import {
   Printer,
   Ban,
 } from "lucide-react";
+import { Value } from "@radix-ui/react-select";
 
 interface PaymentState {
   method: "cash" | "transfer" | "mixed";
@@ -191,24 +192,41 @@ export function POSInterface() {
       method: "cash",
       cashAmount: cartTotal,
       transferAmount: 0,
-      cashReceived: cartTotal,
+      cashReceived: 0,
       cashReturned: 0,
     });
     setShowPaymentDialog(true);
   };
 
   const handlePaymentMethodChange = (method: "cash" | "transfer" | "mixed") => {
-    const newCashReceived = method === "transfer" ? 0 : cartTotal;
-    const newCashReturned = method === "transfer" ? 0 : 0;
-
-    setPayment((prev) => ({
-      ...prev,
-      method,
-      cashAmount: method === "transfer" ? 0 : cartTotal,
-      transferAmount: method === "cash" ? 0 : cartTotal,
-      cashReceived: newCashReceived,
-      cashReturned: newCashReturned,
-    }));
+    if (method === "cash") {
+      setPayment((prev) => ({
+        ...prev,
+        method,
+        cashAmount: cartTotal,
+        transferAmount: 0,
+        cashReceived: 0,
+        cashReturned: 0,
+      }));
+    } else if (method === "transfer") {
+      setPayment((prev) => ({
+        ...prev,
+        method,
+        cashAmount: 0,
+        transferAmount: cartTotal,
+        cashReceived: 0,
+        cashReturned: 0,
+      }));
+    } else {
+      setPayment((prev) => ({
+        ...prev,
+        method,
+        cashAmount: 0,
+        transferAmount: 0,
+        cashReceived: 0,
+        cashReturned: 0,
+      }));
+    }
   };
 
   const updateCashReceived = (value: number) => {
@@ -244,7 +262,17 @@ export function POSInterface() {
         if (Math.abs(totalPayment - cartTotal) > 0.01) {
           toast({
             title: "Error en el pago",
-            description: `El total del pago ($${totalPayment.toFixed(2)}) no coincide con el total de la venta ($${cartTotal.toFixed(2)})`,
+            description: `El total del pago ($${totalPayment.toLocaleString(
+              "en-US",
+              {
+                maximumFractionDigits: 0,
+              },
+            )}) no coincide con el total de la venta ($${cartTotal.toLocaleString(
+              "en-US",
+              {
+                maximumFractionDigits: 0,
+              },
+            )})`,
             variant: "destructive",
           });
           return;
@@ -257,7 +285,17 @@ export function POSInterface() {
       ) {
         toast({
           title: "Monto insuficiente",
-          description: `El monto recibido ($${payment.cashReceived.toFixed(2)}) es menor al monto en efectivo ($${payment.cashAmount.toFixed(2)})`,
+          description: `El monto recibido ($${payment.cashReceived.toLocaleString(
+            "en-US",
+            {
+              maximumFractionDigits: 0,
+            },
+          )}) es menor al monto en efectivo ($${payment.cashAmount.toLocaleString(
+            "en-US",
+            {
+              maximumFractionDigits: 0,
+            },
+          )})`,
           variant: "destructive",
         });
         return;
@@ -269,7 +307,17 @@ export function POSInterface() {
       ) {
         toast({
           title: "Monto en efectivo insuficiente",
-          description: `El efectivo recibido ($${payment.cashReceived.toFixed(2)}) es menor a la parte en efectivo ($${payment.cashAmount.toFixed(2)})`,
+          description: `El efectivo recibido ($${payment.cashReceived.toLocaleString(
+            "en-US",
+            {
+              maximumFractionDigits: 0,
+            },
+          )}) es menor a la parte en efectivo ($${payment.cashAmount.toLocaleString(
+            "en-US",
+            {
+              maximumFractionDigits: 0,
+            },
+          )})`,
           variant: "destructive",
         });
         return;
@@ -289,7 +337,12 @@ export function POSInterface() {
       if (sale) {
         toast({
           title: "Venta completada",
-          description: `Venta #${sale.id.slice(-6).toUpperCase()} por $${cartTotal.toFixed(2)}`,
+          description: `Venta #${sale.id.slice(-6).toUpperCase()} por $${cartTotal.toLocaleString(
+            "en-US",
+            {
+              maximumFractionDigits: 0,
+            },
+          )}`,
         });
       } else {
         toast({
@@ -464,7 +517,9 @@ export function POSInterface() {
                 ${item.quantity}x ${item.productName}
               </div>
               <div class="item-price">
-                $${item.total.toFixed(2)}
+                $${item.total.toLocaleString("en-US", {
+                  maximumFractionDigits: 0,
+                })}
               </div>
             </div>
           `,
@@ -475,35 +530,50 @@ export function POSInterface() {
           
           <div class="item total">
             <span>TOTAL:</span>
-            <span>$${sale.total.toFixed(2)}</span>
+            <span>$${sale.total.toLocaleString("en-US", {
+              maximumFractionDigits: 0,
+            })}</span>
           </div>
           
           <div class="payment-details">
             <div class="payment-row">
               <span>Efectivo:</span>
-              <span>$${sale.cashAmount.toFixed(2)}</span>
+              <span>$${sale.cashAmount.toLocaleString("en-US", {
+                maximumFractionDigits: 0,
+              })}</span>
             </div>
             <div class="payment-row">
               <span>Transferencia:</span>
-              <span>$${sale.transferAmount.toFixed(2)}</span>
+              <span>$${sale.transferAmount.toLocaleString("en-US", {
+                maximumFractionDigits: 0,
+              })}</span>
             </div>
             ${
               sale.cashAmount > 0
                 ? `
               <div class="payment-row">
                 <span>Recibido:</span>
-                <span>$${sale.cashReceived.toFixed(2)}</span>
+                <span>$${sale.cashReceived.toLocaleString("en-US", {
+                  maximumFractionDigits: 0,
+                })}</span>
               </div>
               <div class="payment-row">
                 <span>Cambio:</span>
-                <span>$${sale.cashReturned.toFixed(2)}</span>
+                <span>$${sale.cashReturned.toLocaleString("en-US", {
+                  maximumFractionDigits: 0,
+                })}</span>
               </div>
             `
                 : ""
             }
             <div class="payment-row total">
               <span>Pagado:</span>
-              <span>$${(sale.cashAmount + sale.transferAmount).toFixed(2)}</span>
+              <span>$${(sale.cashAmount + sale.transferAmount).toLocaleString(
+                "en-US",
+                {
+                  maximumFractionDigits: 0,
+                },
+              )}</span>
             </div>
           </div>
           
@@ -569,7 +639,10 @@ export function POSInterface() {
                   </h3>
                   <div className="flex items-center justify-between">
                     <span className="text-lg font-bold text-primary">
-                      ${product.price.toFixed(2)}
+                      $
+                      {product.price.toLocaleString("es-MX", {
+                        minimumFractionDigits: 0,
+                      })}
                     </span>
                     {product.hasInventoryControl && (
                       <Badge
@@ -627,7 +700,11 @@ export function POSInterface() {
                     </p>
 
                     <p className="text-xs text-muted-foreground">
-                      ${item.unitPrice.toFixed(2)} c/u
+                      $
+                      {item.unitPrice.toLocaleString("en-US", {
+                        maximumFractionDigits: 0,
+                      })}{" "}
+                      c/u
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
@@ -652,7 +729,12 @@ export function POSInterface() {
                     </Button>
                   </div>
                   <div className="w-20 text-right">
-                    <p className="font-semibold">${item.total.toFixed(2)}</p>
+                    <p className="font-semibold">
+                      $
+                      {item.total.toLocaleString("en-US", {
+                        maximumFractionDigits: 0,
+                      })}
+                    </p>
                   </div>
                   <Button
                     variant="ghost"
@@ -671,7 +753,12 @@ export function POSInterface() {
         <div className="p-4 border-t space-y-4">
           <div className="flex items-center justify-between text-xl font-bold">
             <span>Total:</span>
-            <span className="text-primary">${cartTotal.toFixed(2)}</span>
+            <span className="text-primary">
+              $
+              {cartTotal.toLocaleString("en-US", {
+                maximumFractionDigits: 0,
+              })}
+            </span>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
@@ -708,7 +795,10 @@ export function POSInterface() {
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">Total a cobrar</p>
                 <p className="text-4xl font-bold text-primary">
-                  ${cartTotal.toFixed(2)}
+                  $
+                  {cartTotal.toLocaleString("en-US", {
+                    maximumFractionDigits: 0,
+                  })}
                 </p>
               </div>
 
@@ -782,14 +872,26 @@ export function POSInterface() {
                           id="cashAmount"
                           value={payment.cashAmount}
                           onChange={(value) => {
+                            const cashValue = Math.min(value, cartTotal);
                             setPayment((prev) => ({
                               ...prev,
-                              cashAmount: value,
-                              transferAmount: Math.max(0, cartTotal - value),
+                              cashAmount: cashValue,
+                              transferAmount: Math.max(
+                                0,
+                                cartTotal - cashValue,
+                              ),
+                              cashReceived:
+                                prev.cashReceived > cashValue
+                                  ? cashValue
+                                  : prev.cashReceived,
+                              cashReturned:
+                                prev.cashReceived > cashValue
+                                  ? prev.cashReceived - cashValue
+                                  : 0,
                             }));
                           }}
                           className="text-base"
-                          placeholder="Ej: 500.00"
+                          placeholder="Ej: 50,000"
                         />
                       </div>
                       <div className="space-y-2">
@@ -800,13 +902,27 @@ export function POSInterface() {
                           id="transferAmount"
                           value={payment.transferAmount}
                           onChange={(value) => {
+                            const transferValue = Math.min(value, cartTotal);
+                            const newCashAmount = Math.max(
+                              0,
+                              cartTotal - transferValue,
+                            );
                             setPayment((prev) => ({
                               ...prev,
-                              transferAmount: value,
-                              cashAmount: Math.max(0, cartTotal - value),
+                              transferAmount: transferValue,
+                              cashAmount: newCashAmount,
+                              cashReceived:
+                                prev.cashReceived > newCashAmount
+                                  ? newCashAmount
+                                  : prev.cashReceived,
+                              cashReturned:
+                                prev.cashReceived > newCashAmount
+                                  ? prev.cashReceived - newCashAmount
+                                  : 0,
                             }));
                           }}
                           className="text-base"
+                          placeholder="Ej: 50,000"
                         />
                       </div>
                     </>
@@ -822,7 +938,7 @@ export function POSInterface() {
                           value={payment.cashReceived}
                           onChange={updateCashReceived}
                           className="text-base"
-                          placeholder="Ej: 1000.00"
+                          placeholder="Ej: 10,000"
                         />
                       </div>
 
@@ -847,8 +963,17 @@ export function POSInterface() {
                             }`}
                           >
                             {payment.cashReceived >= payment.cashAmount
-                              ? `$${payment.cashReturned.toFixed(2)}`
-                              : `$${(payment.cashAmount - payment.cashReceived).toFixed(2)}`}
+                              ? `$${payment.cashReturned.toLocaleString(
+                                  "en-US",
+                                  {
+                                    maximumFractionDigits: 0,
+                                  },
+                                )}`
+                              : `$${(
+                                  payment.cashAmount - payment.cashReceived
+                                ).toLocaleString("en-US", {
+                                  maximumFractionDigits: 0,
+                                })}`}
                           </p>
                           {payment.cashReceived < payment.cashAmount && (
                             <p className="text-xs text-destructive mt-1">
@@ -884,25 +1009,50 @@ export function POSInterface() {
               <div className="rounded-lg bg-secondary/30 p-3 space-y-2">
                 <div className="flex justify-between">
                   <span className="text-sm">Total venta:</span>
-                  <span className="font-semibold">${cartTotal.toFixed(2)}</span>
+                  <span className="font-semibold">
+                    $
+                    {cartTotal.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm">Efectivo:</span>
-                  <span>${payment.cashAmount.toFixed(2)}</span>
+                  <span>
+                    $
+                    {payment.cashAmount.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm">Transferencia:</span>
-                  <span>${payment.transferAmount.toFixed(2)}</span>
+                  <span>
+                    $
+                    {payment.transferAmount.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}
+                  </span>
                 </div>
                 {payment.cashAmount > 0 && (
                   <>
                     <div className="flex justify-between">
                       <span className="text-sm">Recibido:</span>
-                      <span>${payment.cashReceived.toFixed(2)}</span>
+                      <span>
+                        $
+                        {payment.cashReceived.toLocaleString("en-US", {
+                          maximumFractionDigits: 0,
+                        })}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm">Cambio:</span>
-                      <span>${payment.cashReturned.toFixed(2)}</span>
+                      <span>
+                        $
+                        {payment.cashReturned.toLocaleString("en-US", {
+                          maximumFractionDigits: 0,
+                        })}
+                      </span>
                     </div>
                   </>
                 )}
@@ -973,21 +1123,42 @@ export function POSInterface() {
                           ))}
                         </div>
                         <div className="mt-2 text-xs text-muted-foreground">
-                          <p>Efectivo: ${sale.cashAmount.toFixed(2)}</p>
                           <p>
-                            Transferencia: ${sale.transferAmount.toFixed(2)}
+                            Efectivo: $
+                            {sale.cashAmount.toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })}
+                          </p>
+                          <p>
+                            Transferencia: $
+                            {sale.transferAmount.toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })}
                           </p>
                           {sale.cashAmount > 0 && (
                             <>
-                              <p>Recibido: ${sale.cashReceived.toFixed(2)}</p>
-                              <p>Cambio: ${sale.cashReturned.toFixed(2)}</p>
+                              <p>
+                                Recibido: $
+                                {sale.cashReceived.toLocaleString("en-US", {
+                                  maximumFractionDigits: 0,
+                                })}
+                              </p>
+                              <p>
+                                Cambio: $
+                                {sale.cashReturned.toLocaleString("en-US", {
+                                  maximumFractionDigits: 0,
+                                })}
+                              </p>
                             </>
                           )}
                         </div>
                       </div>
                       <div className="text-right">
                         <p className="text-xl font-bold">
-                          ${sale.total.toFixed(2)}
+                          $
+                          {sale.total.toLocaleString("en-US", {
+                            maximumFractionDigits: 0,
+                          })}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {sale.paymentMethod === "cash"
@@ -1031,7 +1202,9 @@ export function POSInterface() {
                 {todaySales
                   .filter((s) => s.status === "completed")
                   .reduce((sum, s) => sum + s.total, 0)
-                  .toFixed(2)}
+                  .toLocaleString("en-US", {
+                    maximumFractionDigits: 0,
+                  })}
               </span>
             </div>
           </div>

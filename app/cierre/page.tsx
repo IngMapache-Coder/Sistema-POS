@@ -91,7 +91,7 @@ export default function CierrePage() {
         lowStockData,
         closuresData,
         configData,
-        closureExists
+        closureExists,
       ] = await Promise.all([
         getTodaySales(),
         getTodayExpenses(),
@@ -99,7 +99,7 @@ export default function CierrePage() {
         getLowStockProducts(),
         getDailyClosures(),
         getConfig(),
-        hasDailyClosure()
+        hasDailyClosure(),
       ]);
 
       setTodaySales(salesData);
@@ -110,7 +110,7 @@ export default function CierrePage() {
 
       const today = new Date().toISOString().split("T")[0];
       const existing = closuresData.find((c) => c.date === today);
-      
+
       // Solo mostrar cierre si existe Y la caja está cerrada
       if (existing && closureExists) {
         setTodayClosure(existing);
@@ -142,18 +142,19 @@ export default function CierrePage() {
 
   // Pagos que salieron de caja (nueva lógica)
   const paymentsFromCashRegister = todayPayments
-    .filter(p => p.fromCashRegister)
+    .filter((p) => p.fromCashRegister)
     .reduce((sum, p) => sum + p.finalAmount, 0);
-  
+
   // Pagos que NO salieron de caja
   const paymentsNotFromCashRegister = todayPayments
-    .filter(p => !p.fromCashRegister)
+    .filter((p) => !p.fromCashRegister)
     .reduce((sum, p) => sum + p.finalAmount, 0);
 
   const dailyBase = config.dailyBase || 0;
-  
+
   // Dinero esperado en caja con nueva lógica
-  const expectedCashInRegister = totalCash + dailyBase - paymentsFromCashRegister;
+  const expectedCashInRegister =
+    totalCash + dailyBase - paymentsFromCashRegister;
 
   // Product summary
   const productSummary = todaySales.reduce(
@@ -221,32 +222,73 @@ export default function CierrePage() {
     csv += "RESUMEN DE VENTAS\n";
     csv += "Producto,Cantidad,Total\n";
     Object.values(productSummary).forEach((p) => {
-      csv += `${p.name},${p.quantity},$${p.total.toFixed(2)}\n`;
+      csv += `${p.name},${p.quantity},$${p.total.toLocaleString("en-US", {
+        maximumFractionDigits: 0,
+      })}\n`;
     });
-    csv += `\nTOTAL VENTAS,,$${totalSales.toFixed(2)}\n`;
-    csv += `Efectivo,,$${totalCash.toFixed(2)}\n`;
-    csv += `Transferencia,,$${totalTransfer.toFixed(2)}\n\n`;
+    csv += `\nTOTAL VENTAS,,$${totalSales.toLocaleString("en-US", {
+      maximumFractionDigits: 0,
+    })}\n`;
+    csv += `Efectivo,,$${totalCash.toLocaleString("en-US", {
+      maximumFractionDigits: 0,
+    })}\n`;
+    csv += `Transferencia,,$${totalTransfer.toLocaleString("en-US", {
+      maximumFractionDigits: 0,
+    })}\n\n`;
 
     csv += "DINERO EN CAJA\n";
-    csv += `Base diaria:,$${dailyBase.toFixed(2)}\n`;
-    csv += `+ Ventas efectivo:,$${totalCash.toFixed(2)}\n`;
-    csv += `- Pagos empleados (de caja):,$${paymentsFromCashRegister.toFixed(2)}\n`;
-    csv += `Total esperado en caja:,$${expectedCashInRegister.toFixed(2)}\n\n`;
+    csv += `Base diaria:,$${dailyBase.toLocaleString("en-US", {
+      maximumFractionDigits: 0,
+    })}\n`;
+    csv += `+ Ventas efectivo:,$${totalCash.toLocaleString("en-US", {
+      maximumFractionDigits: 0,
+    })}\n`;
+    csv += `- Pagos empleados (de caja):,$${paymentsFromCashRegister.toLocaleString(
+      "en-US",
+      {
+        maximumFractionDigits: 0,
+      },
+    )}\n`;
+    csv += `Total esperado en caja:,$${expectedCashInRegister.toLocaleString(
+      "en-US",
+      {
+        maximumFractionDigits: 0,
+      },
+    )}\n\n`;
 
     csv += "GASTOS\n";
     csv += "Descripcion,Categoria,Monto\n";
     todayExpenses.forEach((e) => {
-      csv += `${e.description},${e.category},$${e.amount.toFixed(2)}\n`;
+      csv += `${e.description},${e.category},$${e.amount.toLocaleString(
+        "en-US",
+        {
+          maximumFractionDigits: 0,
+        },
+      )}\n`;
     });
-    csv += `\nTOTAL GASTOS,,$${totalExpenses.toFixed(2)}\n\n`;
+    csv += `\nTOTAL GASTOS,,$${totalExpenses.toLocaleString("en-US", {
+      maximumFractionDigits: 0,
+    })}\n\n`;
 
     csv += "PAGOS A EMPLEADOS\n";
     csv += "Empleado,Puesto,Monto,De Caja\n";
     todayPayments.forEach((p) => {
-      csv += `${p.employeeName},${p.position},$${p.finalAmount.toFixed(2)},${p.fromCashRegister ? "SÍ" : "NO"}\n`;
+      csv += `${p.employeeName},${p.position},$${p.finalAmount.toLocaleString(
+        "en-US",
+        {
+          maximumFractionDigits: 0,
+        },
+      )},${p.fromCashRegister ? "SÍ" : "NO"}\n`;
     });
-    csv += `\nTOTAL PAGOS (de caja),,$${paymentsFromCashRegister.toFixed(2)}\n`;
-    csv += `TOTAL PAGOS (total),,$${totalPayments.toFixed(2)}\n\n`;
+    csv += `\nTOTAL PAGOS (de caja),,$${paymentsFromCashRegister.toLocaleString(
+      "en-US",
+      {
+        maximumFractionDigits: 0,
+      },
+    )}\n`;
+    csv += `TOTAL PAGOS (total),,$${totalPayments.toLocaleString("en-US", {
+      maximumFractionDigits: 0,
+    })}\n\n`;
 
     // Download file
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -356,15 +398,32 @@ export default function CierrePage() {
                   (p) => `
                 <div class="item">
                   <span>${p.quantity}x ${p.name}</span>
-                  <span>$${p.total.toFixed(2)}</span>
+                  <span>$${p.total.toLocaleString("en-US", {
+                    maximumFractionDigits: 0,
+                  })}</span>
                 </div>
               `,
                 )
                 .join("")}
               <div class="total-line">
-                <div class="item"><span>TOTAL VENTAS</span><span>$${totalSales.toFixed(2)}</span></div>
-                <div class="item"><span>- Efectivo</span><span>$${totalCash.toFixed(2)}</span></div>
-                <div class="item"><span>- Transferencia</span><span>$${totalTransfer.toFixed(2)}</span></div>
+                <div class="item"><span>TOTAL VENTAS</span><span>$${totalSales.toLocaleString(
+                  "en-US",
+                  {
+                    maximumFractionDigits: 0,
+                  },
+                )}</span></div>
+                <div class="item"><span>- Efectivo</span><span>$${totalCash.toLocaleString(
+                  "en-US",
+                  {
+                    maximumFractionDigits: 0,
+                  },
+                )}</span></div>
+                <div class="item"><span>- Transferencia</span><span>$${totalTransfer.toLocaleString(
+                  "en-US",
+                  {
+                    maximumFractionDigits: 0,
+                  },
+                )}</span></div>
               </div>
             </div>
 
@@ -372,18 +431,29 @@ export default function CierrePage() {
               <div class="section-title">DINERO EN CAJA</div>
               <div class="cash-register-item">
                 <span>Base diaria:</span>
-                <span>$${dailyBase.toFixed(2)}</span>
+                <span>$${dailyBase.toLocaleString("en-US", {
+                  maximumFractionDigits: 0,
+                })}</span>
               </div>
               <div class="cash-register-item">
                 <span>+ Ventas efectivo:</span>
-                <span>+$${totalCash.toFixed(2)}</span>
+                <span>+$${totalCash.toLocaleString("en-US", {
+                  maximumFractionDigits: 0,
+                })}</span>
               </div>
               <div class="cash-register-item">
                 <span>- Pagos empleados (de caja):</span>
-                <span>-$${paymentsFromCashRegister.toFixed(2)}</span>
+                <span>-$${paymentsFromCashRegister.toLocaleString("en-US", {
+                  maximumFractionDigits: 0,
+                })}</span>
               </div>
               <div class="total-line">
-                <div class="item"><span>TOTAL ESPERADO EN CAJA</span><span>$${expectedCashInRegister.toFixed(2)}</span></div>
+                <div class="item"><span>TOTAL ESPERADO EN CAJA</span><span>$${expectedCashInRegister.toLocaleString(
+                  "en-US",
+                  {
+                    maximumFractionDigits: 0,
+                  },
+                )}</span></div>
               </div>
               <div style="font-size: 9px; color: #666; margin-top: 5px;">
                 Esta cantidad debe estar físicamente en caja
@@ -398,14 +468,21 @@ export default function CierrePage() {
                     (e) => `
                 <div class="item">
                   <span>${e.description}</span>
-                  <span>-$${e.amount.toFixed(2)}</span>
+                  <span>-$${e.amount.toLocaleString("en-US", {
+                    maximumFractionDigits: 0,
+                  })}</span>
                 </div>
               `,
                   )
                   .join("") || "<div>Sin gastos registrados</div>"
               }
               <div class="total-line">
-                <div class="item"><span>TOTAL GASTOS</span><span>-$${totalExpenses.toFixed(2)}</span></div>
+                <div class="item"><span>TOTAL GASTOS</span><span>-$${totalExpenses.toLocaleString(
+                  "en-US",
+                  {
+                    maximumFractionDigits: 0,
+                  },
+                )}</span></div>
               </div>
             </div>
 
@@ -417,16 +494,33 @@ export default function CierrePage() {
                     (p) => `
                 <div class="item">
                   <span>${p.employeeName} ${p.fromCashRegister ? '<span class="from-cash-badge">DE CAJA</span>' : '<span class="not-from-cash-badge">FUERA CAJA</span>'}</span>
-                  <span>-$${p.finalAmount.toFixed(2)}</span>
+                  <span>-$${p.finalAmount.toLocaleString("en-US", {
+                    maximumFractionDigits: 0,
+                  })}</span>
                 </div>
               `,
                   )
                   .join("") || "<div>Sin pagos registrados</div>"
               }
               <div class="total-line">
-                <div class="item"><span>PAGOS (de caja)</span><span>-$${paymentsFromCashRegister.toFixed(2)}</span></div>
-                <div class="item"><span>PAGOS (fuera de caja)</span><span>-$${paymentsNotFromCashRegister.toFixed(2)}</span></div>
-                <div class="item"><span>TOTAL PAGOS</span><span>-$${totalPayments.toFixed(2)}</span></div>
+                <div class="item"><span>PAGOS (de caja)</span><span>-$${paymentsFromCashRegister.toLocaleString(
+                  "en-US",
+                  {
+                    maximumFractionDigits: 0,
+                  },
+                )}</span></div>
+                <div class="item"><span>PAGOS (fuera de caja)</span><span>-$${paymentsNotFromCashRegister.toLocaleString(
+                  "en-US",
+                  {
+                    maximumFractionDigits: 0,
+                  },
+                )}</span></div>
+                <div class="item"><span>TOTAL PAGOS</span><span>-$${totalPayments.toLocaleString(
+                  "en-US",
+                  {
+                    maximumFractionDigits: 0,
+                  },
+                )}</span></div>
               </div>
             </div>
           </body>
@@ -483,7 +577,10 @@ export default function CierrePage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-bold text-success">
-                    ${totalSales.toFixed(2)}
+                    $
+                    {totalSales.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {todaySales.length} transacciones
@@ -500,7 +597,10 @@ export default function CierrePage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-bold text-destructive">
-                    -${totalExpenses.toFixed(2)}
+                    -$
+                    {totalExpenses.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {todayExpenses.length} gastos
@@ -517,19 +617,28 @@ export default function CierrePage() {
                 <CardContent>
                   <div className="space-y-1">
                     <p className="text-2xl font-bold text-destructive">
-                      -${totalPayments.toFixed(2)}
+                      -$
+                      {totalPayments.toLocaleString("en-US", {
+                        maximumFractionDigits: 0,
+                      })}
                     </p>
                     <div className="text-xs text-muted-foreground">
                       <div className="flex justify-between">
                         <span>De caja:</span>
                         <span className="text-destructive font-medium">
-                          -${paymentsFromCashRegister.toFixed(2)}
+                          -$
+                          {paymentsFromCashRegister.toLocaleString("en-US", {
+                            maximumFractionDigits: 0,
+                          })}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span>Fuera caja:</span>
                         <span>
-                          -${paymentsNotFromCashRegister.toFixed(2)}
+                          -$
+                          {paymentsNotFromCashRegister.toLocaleString("en-US", {
+                            maximumFractionDigits: 0,
+                          })}
                         </span>
                       </div>
                     </div>
@@ -550,14 +659,22 @@ export default function CierrePage() {
                       <span className="text-sm text-muted-foreground">
                         Base:
                       </span>
-                      <span className="text-sm">${dailyBase.toFixed(2)}</span>
+                      <span className="text-sm">
+                        $
+                        {dailyBase.toLocaleString("en-US", {
+                          maximumFractionDigits: 0,
+                        })}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">
                         + Ventas efectivo:
                       </span>
                       <span className="text-sm text-success">
-                        ${totalCash.toFixed(2)}
+                        $
+                        {totalCash.toLocaleString("en-US", {
+                          maximumFractionDigits: 0,
+                        })}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
@@ -565,19 +682,26 @@ export default function CierrePage() {
                         - Pagos (de caja):
                       </span>
                       <span className="text-sm text-destructive">
-                        -${paymentsFromCashRegister.toFixed(2)}
+                        -$
+                        {paymentsFromCashRegister.toLocaleString("en-US", {
+                          maximumFractionDigits: 0,
+                        })}
                       </span>
                     </div>
                     <Separator className="my-1" />
                     <div className="flex justify-between items-center">
                       <span className="font-semibold">Total esperado:</span>
                       <span className="text-xl font-bold text-success">
-                        ${expectedCashInRegister.toFixed(2)}
+                        $
+                        {expectedCashInRegister.toLocaleString("en-US", {
+                          maximumFractionDigits: 0,
+                        })}
                       </span>
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Esta cantidad debe estar físicamente en caja al final del día
+                    Esta cantidad debe estar físicamente en caja al final del
+                    día
                   </p>
                 </CardContent>
               </Card>
@@ -597,7 +721,10 @@ export default function CierrePage() {
                     <div>
                       <p className="text-sm text-muted-foreground">Efectivo</p>
                       <p className="text-xl font-bold">
-                        ${totalCash.toFixed(2)}
+                        $
+                        {totalCash.toLocaleString("en-US", {
+                          maximumFractionDigits: 0,
+                        })}
                       </p>
                     </div>
                   </div>
@@ -608,7 +735,10 @@ export default function CierrePage() {
                         Transferencia
                       </p>
                       <p className="text-xl font-bold">
-                        ${totalTransfer.toFixed(2)}
+                        $
+                        {totalTransfer.toLocaleString("en-US", {
+                          maximumFractionDigits: 0,
+                        })}
                       </p>
                     </div>
                   </div>
@@ -634,47 +764,74 @@ export default function CierrePage() {
                       <Banknote className="h-4 w-4 text-success" />
                       <span>Base diaria inicial</span>
                     </div>
-                    <span className="font-semibold">${dailyBase.toFixed(2)}</span>
+                    <span className="font-semibold">
+                      $
+                      {dailyBase.toLocaleString("en-US", {
+                        maximumFractionDigits: 0,
+                      })}
+                    </span>
                   </div>
-                  
+
                   <div className="flex items-center justify-between p-3 rounded-lg bg-success/10">
                     <div className="flex items-center gap-2">
                       <TrendingUp className="h-4 w-4 text-success" />
                       <span>+ Ventas en efectivo</span>
                     </div>
                     <span className="font-semibold text-success">
-                      +${totalCash.toFixed(2)}
+                      +$
+                      {totalCash.toLocaleString("en-US", {
+                        maximumFractionDigits: 0,
+                      })}
                     </span>
                   </div>
-                  
+
                   <div className="flex items-center justify-between p-3 rounded-lg bg-destructive/5">
                     <div className="flex items-center gap-2">
                       <Wallet className="h-4 w-4 text-destructive" />
                       <span>- Pagos empleados (de caja)</span>
-                      <Badge variant="outline" className="text-xs bg-destructive/10">
-                        {todayPayments.filter(p => p.fromCashRegister).length} pagos
+                      <Badge
+                        variant="outline"
+                        className="text-xs bg-destructive/10"
+                      >
+                        {todayPayments.filter((p) => p.fromCashRegister).length}{" "}
+                        pagos
                       </Badge>
                     </div>
                     <span className="font-semibold text-destructive">
-                      -${paymentsFromCashRegister.toFixed(2)}
+                      -$
+                      {paymentsFromCashRegister.toLocaleString("en-US", {
+                        maximumFractionDigits: 0,
+                      })}
                     </span>
                   </div>
-                  
+
                   <Separator />
-                  
+
                   <div className="flex items-center justify-between p-4 rounded-lg bg-success/20 border border-success/30">
                     <div className="flex items-center gap-2">
                       <Banknote className="h-5 w-5 text-success" />
                       <span className="font-bold text-lg">Total en caja</span>
                     </div>
                     <span className="text-2xl font-bold text-success">
-                      ${expectedCashInRegister.toFixed(2)}
+                      $
+                      {expectedCashInRegister.toLocaleString("en-US", {
+                        maximumFractionDigits: 0,
+                      })}
                     </span>
                   </div>
-                  
+
                   <div className="text-sm text-muted-foreground">
-                    <p>💰 <strong>Nota importante:</strong> Este es el dinero que debe estar físicamente en la caja registradora.</p>
-                    <p>📝 Los pagos "fuera de caja" (${paymentsNotFromCashRegister.toFixed(2)}) no afectan este cálculo.</p>
+                    <p>
+                      💰 <strong>Nota importante:</strong> Este es el dinero que
+                      debe estar físicamente en la caja registradora.
+                    </p>
+                    <p>
+                      📝 Los pagos "fuera de caja" ($
+                      {paymentsNotFromCashRegister.toLocaleString("en-US", {
+                        maximumFractionDigits: 0,
+                      })}
+                      ) no afectan este cálculo.
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -706,7 +863,10 @@ export default function CierrePage() {
                             <span>{product.name}</span>
                           </div>
                           <span className="font-semibold">
-                            ${product.total.toFixed(2)}
+                            $
+                            {product.total.toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })}
                           </span>
                         </div>
                       ))}
@@ -739,7 +899,10 @@ export default function CierrePage() {
                           </Badge>
                         </div>
                         <span className="font-semibold text-destructive">
-                          -${expense.amount.toFixed(2)}
+                          -$
+                          {expense.amount.toLocaleString("en-US", {
+                            maximumFractionDigits: 0,
+                          })}
                         </span>
                       </div>
                     ))}
@@ -770,15 +933,25 @@ export default function CierrePage() {
                             <span className="font-medium">
                               {payment.employeeName}
                             </span>
-                            <Badge 
-                              variant={payment.fromCashRegister ? "destructive" : "outline"}
-                              className={payment.fromCashRegister ? "bg-destructive/10 text-destructive border-destructive/20" : ""}
+                            <Badge
+                              variant={
+                                payment.fromCashRegister
+                                  ? "destructive"
+                                  : "outline"
+                              }
+                              className={
+                                payment.fromCashRegister
+                                  ? "bg-destructive/10 text-destructive border-destructive/20"
+                                  : ""
+                              }
                             >
                               <div className="flex items-center gap-1">
                                 {payment.fromCashRegister ? (
                                   <Wallet className="h-3 w-3" />
                                 ) : null}
-                                {payment.fromCashRegister ? 'De caja' : 'Fuera caja'}
+                                {payment.fromCashRegister
+                                  ? "De caja"
+                                  : "Fuera caja"}
                               </div>
                             </Badge>
                             <span className="text-sm text-muted-foreground">
@@ -793,15 +966,21 @@ export default function CierrePage() {
                         </div>
                         <div className="text-right">
                           <span className="font-semibold text-destructive">
-                            -${payment.finalAmount.toFixed(2)}
+                            -$
+                            {payment.finalAmount.toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })}
                           </span>
                           <div className="text-xs text-muted-foreground">
-                            Base: ${payment.baseAmount.toFixed(2)}
+                            Base: $
+                            {payment.baseAmount.toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })}
                           </div>
                         </div>
                       </div>
                     ))}
-                    
+
                     {/* Resumen de pagos */}
                     <div className="mt-4 pt-4 border-t">
                       <div className="flex justify-between items-center">
@@ -812,7 +991,10 @@ export default function CierrePage() {
                           </div>
                         </div>
                         <span className="font-semibold text-destructive">
-                          -${paymentsFromCashRegister.toFixed(2)}
+                          -$
+                          {paymentsFromCashRegister.toLocaleString("en-US", {
+                            maximumFractionDigits: 0,
+                          })}
                         </span>
                       </div>
                       <div className="flex justify-between items-center mt-1">
@@ -823,14 +1005,20 @@ export default function CierrePage() {
                           </div>
                         </div>
                         <span className="font-semibold">
-                          -${paymentsNotFromCashRegister.toFixed(2)}
+                          -$
+                          {paymentsNotFromCashRegister.toLocaleString("en-US", {
+                            maximumFractionDigits: 0,
+                          })}
                         </span>
                       </div>
                       <Separator className="my-2" />
                       <div className="flex justify-between items-center font-bold">
                         <span>Total pagos:</span>
                         <span className="text-lg text-destructive">
-                          -${totalPayments.toFixed(2)}
+                          -$
+                          {totalPayments.toLocaleString("en-US", {
+                            maximumFractionDigits: 0,
+                          })}
                         </span>
                       </div>
                     </div>
@@ -952,44 +1140,65 @@ export default function CierrePage() {
                 <div className="flex justify-between">
                   <span>Ventas:</span>
                   <span className="font-semibold text-success">
-                    ${totalSales.toFixed(2)}
+                    $
+                    {totalSales.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Efectivo:</span>
                   <span className="font-semibold text-success">
-                    ${totalCash.toFixed(2)}
+                    $
+                    {totalCash.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Transferencia:</span>
                   <span className="font-semibold text-primary">
-                    ${totalTransfer.toFixed(2)}
+                    $
+                    {totalTransfer.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Gastos:</span>
                   <span className="font-semibold text-destructive">
-                    -${totalExpenses.toFixed(2)}
+                    -$
+                    {totalExpenses.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Pagos empleados (total):</span>
                   <span className="font-semibold text-destructive">
-                    -${totalPayments.toFixed(2)}
+                    -$
+                    {totalPayments.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Pagos de caja:</span>
                   <span className="font-semibold text-destructive">
-                    -${paymentsFromCashRegister.toFixed(2)}
+                    -$
+                    {paymentsFromCashRegister.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}
                   </span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-bold text-lg">
                   <span>Dinero esperado en caja:</span>
                   <span className="text-success">
-                    ${expectedCashInRegister.toFixed(2)}
+                    $
+                    {expectedCashInRegister.toLocaleString("en-US", {
+                      maximumFractionDigits: 0,
+                    })}
                   </span>
                 </div>
               </div>
