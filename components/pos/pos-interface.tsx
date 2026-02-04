@@ -528,7 +528,7 @@ export function POSInterface() {
                   variant={
                     selectedCategory === category.id ? "default" : "outline"
                   }
-                  className="pos-button px-6 py-3 text-base whitespace-nowrap flex-shrink-0"
+                  className="pos-button px-6 py-3 text-base whitespace-nowrap shrink-0"
                   style={{
                     backgroundColor:
                       selectedCategory === category.id
@@ -555,7 +555,7 @@ export function POSInterface() {
             {products.map((product) => (
               <Card
                 key={product.id}
-                className="p-4 cursor-pointer hover:bg-accent/50 active:scale-95 transition-all min-h-12 flex-shrink-0"
+                className="p-4 cursor-pointer hover:bg-accent/50 active:scale-95 transition-all min-h-12 shrink-0"
                 onClick={() => addToCart(product)}
               >
                 <div className="flex flex-col gap-2">
