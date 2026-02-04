@@ -587,7 +587,7 @@ export function POSInterface() {
       </div>
 
       {/* Cart Section */}
-      <Card className="w-80 lg:w-96 flex flex-col bg-card">
+      <Card className="w-fit max-w-[95vw] flex flex-col bg-card">
         <div className="p-4 border-b flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShoppingCart className="h-5 w-5" />
@@ -603,7 +603,7 @@ export function POSInterface() {
           </Button>
         </div>
 
-        <ScrollArea className="flex-1 p-4">
+        <ScrollArea className="flex-1 p-4 overflow-x-auto">
           {cart.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
               <ShoppingCart className="h-12 w-12 mb-2 opacity-50" />
