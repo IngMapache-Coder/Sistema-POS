@@ -144,6 +144,11 @@ export function POSInterface() {
     });
   };
 
+  const truncateText = (text: string, max: number) => {
+    if (text.length <= max) return text;
+    return text.slice(0, max) + "...";
+  };
+
   const updateQuantity = (productId: string, delta: number) => {
     setCart((prevCart) => {
       return prevCart
@@ -617,9 +622,10 @@ export function POSInterface() {
                   className="flex items-center gap-3 p-2 rounded-lg bg-secondary/50"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">
-                      {item.productName}
+                    <p className="font-medium text-sm">
+                      {truncateText(item.productName, 25)}
                     </p>
+
                     <p className="text-xs text-muted-foreground">
                       ${item.unitPrice.toFixed(2)} c/u
                     </p>
