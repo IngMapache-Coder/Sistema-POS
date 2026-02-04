@@ -81,14 +81,17 @@ export default function ReportesPage() {
     try {
       setLoading(true);
       
+      // Primero obtenemos la configuración
       const config = await getConfig();
-      setTopN(config.topN);
+      const currentTopN = config.topN;
+      setTopN(currentTopN);
       
+      // Luego cargamos todos los datos usando currentTopN
       const [dailyData, monthlyData, topData, bottomData] = await Promise.all([
         getDailyStats(30),
         getMonthlyStats(12),
-        getTopProducts(config.topN, "all"),
-        getBottomProducts(config.topN, "all")
+        getTopProducts(currentTopN, undefined), // undefined = "all"
+        getBottomProducts(currentTopN, undefined)
       ]);
       
       setDailyStats(dailyData);

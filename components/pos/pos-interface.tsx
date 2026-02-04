@@ -43,10 +43,10 @@ import {
 
 interface PaymentState {
   method: "cash" | "transfer" | "mixed";
-  cashAmount: number;           // Parte en efectivo de la venta
-  transferAmount: number;       // Parte por transferencia
-  cashReceived: number;         // Efectivo recibido del cliente
-  cashReturned: number;         // Cambio a devolver
+  cashAmount: number; // Parte en efectivo de la venta
+  transferAmount: number; // Parte por transferencia
+  cashReceived: number; // Efectivo recibido del cliente
+  cashReturned: number; // Cambio a devolver
 }
 
 export function POSInterface() {
@@ -77,7 +77,7 @@ export function POSInterface() {
       if (cats.length > 0 && !selectedCategory) {
         setSelectedCategory(cats[0].id);
       }
-      
+
       const configData = await getConfig();
       setConfig(configData);
     } catch (error) {
@@ -113,7 +113,7 @@ export function POSInterface() {
         });
       }
     };
-    
+
     loadProducts();
   }, [selectedCategory, productsTimestamp, toast]);
 
@@ -195,7 +195,7 @@ export function POSInterface() {
   const handlePaymentMethodChange = (method: "cash" | "transfer" | "mixed") => {
     const newCashReceived = method === "transfer" ? 0 : cartTotal;
     const newCashReturned = method === "transfer" ? 0 : 0;
-    
+
     setPayment((prev) => ({
       ...prev,
       method,
@@ -209,10 +209,9 @@ export function POSInterface() {
   const updateCashReceived = (value: number) => {
     setPayment((prev) => {
       const cashReceived = Math.max(0, value);
-      const cashReturned = cashReceived > prev.cashAmount 
-        ? cashReceived - prev.cashAmount 
-        : 0;
-      
+      const cashReturned =
+        cashReceived > prev.cashAmount ? cashReceived - prev.cashAmount : 0;
+
       return {
         ...prev,
         cashReceived,
@@ -227,12 +226,13 @@ export function POSInterface() {
       if (isClosed) {
         toast({
           title: "Cierre de caja realizado",
-          description: "No se pueden registrar ventas después del cierre de caja",
+          description:
+            "No se pueden registrar ventas después del cierre de caja",
           variant: "destructive",
         });
         return;
       }
-      
+
       // Validaciones
       if (payment.method === "mixed") {
         const totalPayment = payment.cashAmount + payment.transferAmount;
@@ -246,7 +246,10 @@ export function POSInterface() {
         }
       }
 
-      if (payment.method === "cash" && payment.cashReceived < payment.cashAmount) {
+      if (
+        payment.method === "cash" &&
+        payment.cashReceived < payment.cashAmount
+      ) {
         toast({
           title: "Monto insuficiente",
           description: `El monto recibido ($${payment.cashReceived.toFixed(2)}) es menor al monto en efectivo ($${payment.cashAmount.toFixed(2)})`,
@@ -255,7 +258,10 @@ export function POSInterface() {
         return;
       }
 
-      if (payment.method === "mixed" && payment.cashReceived < payment.cashAmount) {
+      if (
+        payment.method === "mixed" &&
+        payment.cashReceived < payment.cashAmount
+      ) {
         toast({
           title: "Monto en efectivo insuficiente",
           description: `El efectivo recibido ($${payment.cashReceived.toFixed(2)}) es menor a la parte en efectivo ($${payment.cashAmount.toFixed(2)})`,
@@ -328,7 +334,7 @@ export function POSInterface() {
         });
         return;
       }
-      
+
       const result = await cancelSale(saleId, "admin");
       if (result) {
         toast({
@@ -476,7 +482,9 @@ export function POSInterface() {
               <span>Transferencia:</span>
               <span>$${sale.transferAmount.toFixed(2)}</span>
             </div>
-            ${sale.cashAmount > 0 ? `
+            ${
+              sale.cashAmount > 0
+                ? `
               <div class="payment-row">
                 <span>Recibido:</span>
                 <span>$${sale.cashReceived.toFixed(2)}</span>
@@ -485,7 +493,9 @@ export function POSInterface() {
                 <span>Cambio:</span>
                 <span>$${sale.cashReturned.toFixed(2)}</span>
               </div>
-            ` : ''}
+            `
+                : ""
+            }
             <div class="payment-row total">
               <span>Pagado:</span>
               <span>$${(sale.cashAmount + sale.transferAmount).toFixed(2)}</span>
@@ -507,35 +517,45 @@ export function POSInterface() {
   return (
     <div className="flex h-full gap-4">
       {/* Products Section */}
-      <div className="flex-1 flex flex-col gap-4">
-        {/* Categories */}
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-          {categories.map((category) => (
-            <Button
-              key={category.id}
-              variant={selectedCategory === category.id ? "default" : "outline"}
-              className="pos-button px-6 py-3 text-base whitespace-nowrap"
-              style={{
-                backgroundColor:
-                  selectedCategory === category.id ? category.color : undefined,
-                borderColor: category.color,
-                color:
-                  selectedCategory === category.id ? "#fff" : category.color,
-              }}
-              onClick={() => setSelectedCategory(category.id)}
-            >
-              {category.name}
-            </Button>
-          ))}
+      <div className="flex-1 flex flex-col gap-4 min-w-0">
+        {/* Categories - Scroll Horizontal */}
+        <div className="relative">
+          <div className="overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+            <div className="flex gap-2 w-max pb-1">
+              {categories.map((category) => (
+                <Button
+                  key={category.id}
+                  variant={
+                    selectedCategory === category.id ? "default" : "outline"
+                  }
+                  className="pos-button px-6 py-3 text-base whitespace-nowrap flex-shrink-0"
+                  style={{
+                    backgroundColor:
+                      selectedCategory === category.id
+                        ? category.color
+                        : undefined,
+                    borderColor: category.color,
+                    color:
+                      selectedCategory === category.id
+                        ? "#fff"
+                        : category.color,
+                  }}
+                  onClick={() => setSelectedCategory(category.id)}
+                >
+                  {category.name}
+                </Button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Products Grid */}
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1 min-h-0">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pr-4">
             {products.map((product) => (
               <Card
                 key={product.id}
-                className="p-4 cursor-pointer hover:bg-accent/50 active:scale-95 transition-all min-h-12"
+                className="p-4 cursor-pointer hover:bg-accent/50 active:scale-95 transition-all min-h-12 flex-shrink-0"
                 onClick={() => addToCart(product)}
               >
                 <div className="flex flex-col gap-2">
@@ -672,219 +692,228 @@ export function POSInterface() {
 
       {/* Payment Dialog */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[85vh]">
           <DialogHeader>
             <DialogTitle>Procesar Pago</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">Total a cobrar</p>
-              <p className="text-4xl font-bold text-primary">
-                ${cartTotal.toFixed(2)}
-              </p>
-            </div>
+          <ScrollArea className="max-h-[65vh] pr-4">
+            <div className="space-y-6 py-2">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Total a cobrar</p>
+                <p className="text-4xl font-bold text-primary">
+                  ${cartTotal.toFixed(2)}
+                </p>
+              </div>
 
-            <div className="space-y-3">
-              <Label>Metodo de pago</Label>
-              <RadioGroup
-                value={payment.method}
-                onValueChange={(v) =>
-                  handlePaymentMethodChange(v as "cash" | "transfer" | "mixed")
-                }
-                className="grid grid-cols-3 gap-2"
-              >
-                <div>
-                  <RadioGroupItem
-                    value="cash"
-                    id="cash"
-                    className="peer sr-only"
-                  />
-                  <Label
-                    htmlFor="cash"
-                    className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
-                  >
-                    <Banknote className="h-6 w-6 mb-2" />
-                    <span className="text-sm font-medium">Efectivo</span>
-                  </Label>
-                </div>
-                <div>
-                  <RadioGroupItem
-                    value="transfer"
-                    id="transfer"
-                    className="peer sr-only"
-                  />
-                  <Label
-                    htmlFor="transfer"
-                    className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
-                  >
-                    <CreditCard className="h-6 w-6 mb-2" />
-                    <span className="text-sm font-medium">Transfer</span>
-                  </Label>
-                </div>
-                <div>
-                  <RadioGroupItem
-                    value="mixed"
-                    id="mixed"
-                    className="peer sr-only"
-                  />
-                  <Label
-                    htmlFor="mixed"
-                    className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
-                  >
-                    <div className="flex gap-1 mb-2">
-                      <Banknote className="h-5 w-5" />
-                      <CreditCard className="h-5 w-5" />
-                    </div>
-                    <span className="text-sm font-medium">Mixto</span>
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
+              <div className="space-y-3">
+                <Label>Metodo de pago</Label>
+                <RadioGroup
+                  value={payment.method}
+                  onValueChange={(v) =>
+                    handlePaymentMethodChange(
+                      v as "cash" | "transfer" | "mixed",
+                    )
+                  }
+                  className="grid grid-cols-3 gap-2"
+                >
+                  <div>
+                    <RadioGroupItem
+                      value="cash"
+                      id="cash"
+                      className="peer sr-only"
+                    />
+                    <Label
+                      htmlFor="cash"
+                      className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
+                    >
+                      <Banknote className="h-5 w-5 mb-2" />
+                      <span className="text-sm font-medium">Efectivo</span>
+                    </Label>
+                  </div>
+                  <div>
+                    <RadioGroupItem
+                      value="transfer"
+                      id="transfer"
+                      className="peer sr-only"
+                    />
+                    <Label
+                      htmlFor="transfer"
+                      className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
+                    >
+                      <CreditCard className="h-5 w-5 mb-2" />
+                      <span className="text-sm font-medium">Transfer</span>
+                    </Label>
+                  </div>
+                  <div>
+                    <RadioGroupItem
+                      value="mixed"
+                      id="mixed"
+                      className="peer sr-only"
+                    />
+                    <Label
+                      htmlFor="mixed"
+                      className="flex flex-col items-center justify-center rounded-lg border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
+                    >
+                      <div className="flex gap-1 mb-2">
+                        <Banknote className="h-4 w-4" />
+                        <CreditCard className="h-4 w-4" />
+                      </div>
+                      <span className="text-sm font-medium">Mixto</span>
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
 
-            {/* Montos por método de pago */}
-            {(payment.method === "mixed" || payment.method === "cash") && (
-              <div className="space-y-4">
-                {payment.method === "mixed" && (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="cashAmount">Monto en Efectivo</Label>
-                      <InputNumber
-                        id="cashAmount"
-                        value={payment.cashAmount}
-                        onChange={(value) => {
-                          setPayment((prev) => ({
-                            ...prev,
-                            cashAmount: value,
-                            transferAmount: Math.max(0, cartTotal - value),
-                          }));
-                        }}
-                        className="text-lg"
-                        placeholder="Ej: 500.00"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="transferAmount">Monto por Transferencia</Label>
-                      <InputNumber
-                        id="transferAmount"
-                        value={payment.transferAmount}
-                        onChange={(value) => {
-                          setPayment((prev) => ({
-                            ...prev,
-                            transferAmount: value,
-                            cashAmount: Math.max(0, cartTotal - value),
-                          }));
-                        }}
-                        className="text-lg"
-                      />
-                    </div>
-                  </>
-                )}
+              {/* Montos por método de pago */}
+              {(payment.method === "mixed" || payment.method === "cash") && (
+                <div className="space-y-4">
+                  {payment.method === "mixed" && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="cashAmount">Monto en Efectivo</Label>
+                        <InputNumber
+                          id="cashAmount"
+                          value={payment.cashAmount}
+                          onChange={(value) => {
+                            setPayment((prev) => ({
+                              ...prev,
+                              cashAmount: value,
+                              transferAmount: Math.max(0, cartTotal - value),
+                            }));
+                          }}
+                          className="text-base"
+                          placeholder="Ej: 500.00"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="transferAmount">
+                          Monto por Transferencia
+                        </Label>
+                        <InputNumber
+                          id="transferAmount"
+                          value={payment.transferAmount}
+                          onChange={(value) => {
+                            setPayment((prev) => ({
+                              ...prev,
+                              transferAmount: value,
+                              cashAmount: Math.max(0, cartTotal - value),
+                            }));
+                          }}
+                          className="text-base"
+                        />
+                      </div>
+                    </>
+                  )}
 
-                {/* Efectivo recibido y cambio */}
-                {payment.cashAmount > 0 && (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="cashReceived">Efectivo Recibido</Label>
-                      <InputNumber
-                        id="cashReceived"
-                        value={payment.cashReceived}
-                        onChange={updateCashReceived}
-                        className="text-lg"
-                        placeholder="Ej: 1000.00"
-                      />
-                    </div>
+                  {/* Efectivo recibido y cambio */}
+                  {payment.cashAmount > 0 && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="cashReceived">Efectivo Recibido</Label>
+                        <InputNumber
+                          id="cashReceived"
+                          value={payment.cashReceived}
+                          onChange={updateCashReceived}
+                          className="text-base"
+                          placeholder="Ej: 1000.00"
+                        />
+                      </div>
 
-                    {payment.cashReceived > 0 && (
-                      <div
-                        className={`rounded-lg p-4 text-center ${
-                          payment.cashReceived >= payment.cashAmount
-                            ? "bg-success/10 border border-success/20"
-                            : "bg-destructive/10 border border-destructive/20"
-                        }`}
-                      >
-                        <p className="text-sm text-muted-foreground">
-                          {payment.cashReceived >= payment.cashAmount
-                            ? "Cambio a devolver:"
-                            : "Falta recibir:"}
-                        </p>
-                        <p
-                          className={`text-2xl font-bold ${
+                      {payment.cashReceived > 0 && (
+                        <div
+                          className={`rounded-lg p-3 text-center ${
                             payment.cashReceived >= payment.cashAmount
-                              ? "text-success"
-                              : "text-destructive"
+                              ? "bg-success/10 border border-success/20"
+                              : "bg-destructive/10 border border-destructive/20"
                           }`}
                         >
-                          {payment.cashReceived >= payment.cashAmount
-                            ? `$${payment.cashReturned.toFixed(2)}`
-                            : `$${(payment.cashAmount - payment.cashReceived).toFixed(2)}`}
-                        </p>
-                        {payment.cashReceived < payment.cashAmount && (
-                          <p className="text-xs text-destructive mt-1">
-                            El monto recibido es menor a la parte en efectivo
+                          <p className="text-sm text-muted-foreground">
+                            {payment.cashReceived >= payment.cashAmount
+                              ? "Cambio a devolver:"
+                              : "Falta recibir:"}
                           </p>
-                        )}
-                      </div>
-                    )}
+                          <p
+                            className={`text-xl font-bold ${
+                              payment.cashReceived >= payment.cashAmount
+                                ? "text-success"
+                                : "text-destructive"
+                            }`}
+                          >
+                            {payment.cashReceived >= payment.cashAmount
+                              ? `$${payment.cashReturned.toFixed(2)}`
+                              : `$${(payment.cashAmount - payment.cashReceived).toFixed(2)}`}
+                          </p>
+                          {payment.cashReceived < payment.cashAmount && (
+                            <p className="text-xs text-destructive mt-1">
+                              El monto recibido es menor a la parte en efectivo
+                            </p>
+                          )}
+                        </div>
+                      )}
 
-                    {payment.cashReceived === payment.cashAmount && (
-                      <div className="rounded-lg bg-secondary/30 p-4 text-center">
-                        <p className="text-sm text-muted-foreground">Pago exacto</p>
-                        <p className="text-lg font-semibold">Sin cambio</p>
-                      </div>
-                    )}
+                      {payment.cashReceived === payment.cashAmount && (
+                        <div className="rounded-lg bg-secondary/30 p-3 text-center">
+                          <p className="text-sm text-muted-foreground">
+                            Pago exacto
+                          </p>
+                          <p className="font-semibold">Sin cambio</p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {payment.method === "transfer" && (
+                <div className="rounded-lg bg-primary/10 p-3 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Pago por transferencia
+                  </p>
+                  <p className="font-semibold">No requiere cambio</p>
+                </div>
+              )}
+
+              {/* Resumen de pagos */}
+              <div className="rounded-lg bg-secondary/30 p-3 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm">Total venta:</span>
+                  <span className="font-semibold">${cartTotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm">Efectivo:</span>
+                  <span>${payment.cashAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm">Transferencia:</span>
+                  <span>${payment.transferAmount.toFixed(2)}</span>
+                </div>
+                {payment.cashAmount > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Recibido:</span>
+                      <span>${payment.cashReceived.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Cambio:</span>
+                      <span>${payment.cashReturned.toFixed(2)}</span>
+                    </div>
                   </>
                 )}
               </div>
-            )}
-
-            {payment.method === "transfer" && (
-              <div className="rounded-lg bg-primary/10 p-4 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Pago por transferencia
-                </p>
-                <p className="text-lg font-semibold">No requiere cambio</p>
-              </div>
-            )}
-
-            {/* Resumen de pagos */}
-            <div className="rounded-lg bg-secondary/30 p-4 space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm">Total venta:</span>
-                <span className="font-semibold">${cartTotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">Efectivo:</span>
-                <span>${payment.cashAmount.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">Transferencia:</span>
-                <span>${payment.transferAmount.toFixed(2)}</span>
-              </div>
-              {payment.cashAmount > 0 && (
-                <>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Recibido:</span>
-                    <span>${payment.cashReceived.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Cambio:</span>
-                    <span>${payment.cashReturned.toFixed(2)}</span>
-                  </div>
-                </>
-              )}
             </div>
-          </div>
+          </ScrollArea>
 
-          <DialogFooter>
+          <DialogFooter className="pt-4 border-t">
             <Button
               variant="outline"
               onClick={() => setShowPaymentDialog(false)}
+              className="px-6"
             >
               Cancelar
             </Button>
             <Button
-              className="bg-success text-success-foreground hover:bg-success/90"
+              className="bg-success text-success-foreground hover:bg-success/90 px-6"
               onClick={handleCompleteSale}
             >
               Completar Venta
@@ -939,7 +968,9 @@ export function POSInterface() {
                         </div>
                         <div className="mt-2 text-xs text-muted-foreground">
                           <p>Efectivo: ${sale.cashAmount.toFixed(2)}</p>
-                          <p>Transferencia: ${sale.transferAmount.toFixed(2)}</p>
+                          <p>
+                            Transferencia: ${sale.transferAmount.toFixed(2)}
+                          </p>
                           {sale.cashAmount > 0 && (
                             <>
                               <p>Recibido: ${sale.cashReceived.toFixed(2)}</p>
