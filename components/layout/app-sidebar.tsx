@@ -1,4 +1,3 @@
-// components/layout/app-sidebar.tsx (actualizado)
 "use client"
 
 import Link from "next/link"
@@ -15,23 +14,24 @@ import {
   Wallet,
   LogOut,
   UserCircle,
-  Shield
+  Shield,
+  Coins
 } from "lucide-react"
 import { PiCatDuotone } from "react-icons/pi";
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { useEffect, useState } from "react"
 
-// components/layout/app-sidebar.tsx (actualiza el array navigation)
 const navigation = [
   { name: "Ventas", href: "/", icon: ShoppingCart, roles: ["admin", "cashier", "employee"] },
   { name: "Menu", href: "/menu", icon: UtensilsCrossed, roles: ["admin"] },
   { name: "Empleados", href: "/empleados", icon: Users, roles: ["admin", "cashier"] },
-  { name: "Usuarios", href: "/usuarios", icon: Shield, roles: ["admin"] }, // Nueva sección
+  { name: "Usuarios", href: "/usuarios", icon: Shield, roles: ["admin"] },
   { name: "Gastos", href: "/gastos", icon: Wallet, roles: ["admin", "cashier"] },
   { name: "Cierre de Caja", href: "/cierre", icon: Calculator, roles: ["admin", "cashier"] },
   { name: "Cierre de caja historico", href: "/cierres-historicos", icon: Receipt, roles: ["admin"] },
   { name: "Reportes", href: "/reportes", icon: BarChart3, roles: ["admin"] },
+  { name: "Cajas", href: "/cajas", icon: Coins, roles: ["admin"] },
   { name: "Configuracion", href: "/configuracion", icon: Settings, roles: ["admin"] },
 ];
 

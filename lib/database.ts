@@ -1,5 +1,5 @@
 // Database functions using Supabase
-import { supabase, handleSupabaseError } from './supabase';
+import { supabase, handleSupabaseError } from "./supabase";
 import type {
   Category,
   Product,
@@ -14,7 +14,9 @@ import type {
   ProductStats,
   LowStockProduct,
   SaleItem,
-} from './types';
+  MajorCashAccount,
+  MajorCashSummary,
+} from "./types";
 
 // Helper functions
 function generateId(): string {
@@ -22,27 +24,27 @@ function generateId(): string {
 }
 
 export function getTodayDate(): string {
-  return new Date().toISOString().split('T')[0];
+  return new Date().toISOString().split("T")[0];
 }
 
 // Categories
 export async function getCategories(): Promise<Category[]> {
   try {
     const { data, error } = await supabase
-      .from('categories')
-      .select('*')
-      .order('order', { ascending: true });
-    
+      .from("categories")
+      .select("*")
+      .order("order", { ascending: true });
+
     if (error) throw error;
     return data || [];
   } catch (error) {
-    handleSupabaseError(error, 'Error al cargar categorías');
+    handleSupabaseError(error, "Error al cargar categorías");
     return [];
   }
 }
 
 export async function saveCategory(
-  category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>
+  category: Omit<Category, "id" | "createdAt" | "updatedAt">,
 ): Promise<Category> {
   try {
     const newCategory = {
@@ -50,15 +52,15 @@ export async function saveCategory(
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    
+
     const { data, error } = await supabase
-      .from('categories')
+      .from("categories")
       .insert(newCategory)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return {
       id: data.id,
       name: data.name,
@@ -68,28 +70,28 @@ export async function saveCategory(
       updatedAt: data.updated_at,
     };
   } catch (error) {
-    handleSupabaseError(error, 'Error al guardar categoría');
+    handleSupabaseError(error, "Error al guardar categoría");
     throw error;
   }
 }
 
 export async function updateCategory(
   id: string,
-  updates: Partial<Category>
+  updates: Partial<Category>,
 ): Promise<Category | null> {
   try {
     const { data, error } = await supabase
-      .from('categories')
+      .from("categories")
       .update({
         ...updates,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', id)
+      .eq("id", id)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return {
       id: data.id,
       name: data.name,
@@ -99,22 +101,19 @@ export async function updateCategory(
       updatedAt: data.updated_at,
     };
   } catch (error) {
-    handleSupabaseError(error, 'Error al actualizar categoría');
+    handleSupabaseError(error, "Error al actualizar categoría");
     return null;
   }
 }
 
 export async function deleteCategory(id: string): Promise<boolean> {
   try {
-    const { error } = await supabase
-      .from('categories')
-      .delete()
-      .eq('id', id);
-    
+    const { error } = await supabase.from("categories").delete().eq("id", id);
+
     if (error) throw error;
     return true;
   } catch (error) {
-    handleSupabaseError(error, 'Error al eliminar categoría');
+    handleSupabaseError(error, "Error al eliminar categoría");
     return false;
   }
 }
@@ -123,12 +122,12 @@ export async function deleteCategory(id: string): Promise<boolean> {
 export async function getProducts(): Promise<Product[]> {
   try {
     const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('is_active', true);
-    
+      .from("products")
+      .select("*")
+      .eq("is_active", true);
+
     if (error) throw error;
-    return (data || []).map(p => ({
+    return (data || []).map((p) => ({
       id: p.id,
       name: p.name,
       price: parseFloat(p.price),
@@ -141,18 +140,20 @@ export async function getProducts(): Promise<Product[]> {
       updatedAt: p.updated_at,
     }));
   } catch (error) {
-    handleSupabaseError(error, 'Error al cargar productos');
+    handleSupabaseError(error, "Error al cargar productos");
     return [];
   }
 }
 
-export async function getProductsByCategory(categoryId: string): Promise<Product[]> {
+export async function getProductsByCategory(
+  categoryId: string,
+): Promise<Product[]> {
   const products = await getProducts();
   return products.filter((p) => p.categoryId === categoryId && p.isActive);
 }
 
 export async function saveProduct(
-  product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>
+  product: Omit<Product, "id" | "createdAt" | "updatedAt">,
 ): Promise<Product> {
   try {
     const newProduct = {
@@ -166,15 +167,15 @@ export async function saveProduct(
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    
+
     const { data, error } = await supabase
-      .from('products')
+      .from("products")
       .insert(newProduct)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return {
       id: data.id,
       name: data.name,
@@ -188,37 +189,39 @@ export async function saveProduct(
       updatedAt: data.updated_at,
     };
   } catch (error) {
-    handleSupabaseError(error, 'Error al guardar producto');
+    handleSupabaseError(error, "Error al guardar producto");
     throw error;
   }
 }
 
 export async function updateProduct(
   id: string,
-  updates: Partial<Product>
+  updates: Partial<Product>,
 ): Promise<Product | null> {
   try {
     const updateData: any = {};
-    
+
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.price !== undefined) updateData.price = updates.price;
-    if (updates.categoryId !== undefined) updateData.category_id = updates.categoryId;
+    if (updates.categoryId !== undefined)
+      updateData.category_id = updates.categoryId;
     if (updates.stock !== undefined) updateData.stock = updates.stock;
     if (updates.minStock !== undefined) updateData.min_stock = updates.minStock;
-    if (updates.hasInventoryControl !== undefined) updateData.has_inventory_control = updates.hasInventoryControl;
+    if (updates.hasInventoryControl !== undefined)
+      updateData.has_inventory_control = updates.hasInventoryControl;
     if (updates.isActive !== undefined) updateData.is_active = updates.isActive;
-    
+
     updateData.updated_at = new Date().toISOString();
-    
+
     const { data, error } = await supabase
-      .from('products')
+      .from("products")
       .update(updateData)
-      .eq('id', id)
+      .eq("id", id)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return {
       id: data.id,
       name: data.name,
@@ -232,7 +235,7 @@ export async function updateProduct(
       updatedAt: data.updated_at,
     };
   } catch (error) {
-    handleSupabaseError(error, 'Error al actualizar producto');
+    handleSupabaseError(error, "Error al actualizar producto");
     return null;
   }
 }
@@ -240,46 +243,49 @@ export async function updateProduct(
 export async function deleteProduct(id: string): Promise<boolean> {
   try {
     const { error } = await supabase
-      .from('products')
+      .from("products")
       .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq('id', id);
-    
+      .eq("id", id);
+
     if (error) throw error;
     return true;
   } catch (error) {
-    handleSupabaseError(error, 'Error al eliminar producto');
+    handleSupabaseError(error, "Error al eliminar producto");
     return false;
   }
 }
 
-export async function updateProductStock(id: string, quantity: number): Promise<boolean> {
+export async function updateProductStock(
+  id: string,
+  quantity: number,
+): Promise<boolean> {
   try {
     // Primero obtenemos el producto actual
     const { data: product, error: fetchError } = await supabase
-      .from('products')
-      .select('stock, has_inventory_control')
-      .eq('id', id)
+      .from("products")
+      .select("stock, has_inventory_control")
+      .eq("id", id)
       .single();
-    
+
     if (fetchError) throw fetchError;
-    
+
     if (product.has_inventory_control) {
       const newStock = Math.max(0, product.stock - quantity);
-      
+
       const { error: updateError } = await supabase
-        .from('products')
-        .update({ 
-          stock: newStock, 
-          updated_at: new Date().toISOString() 
+        .from("products")
+        .update({
+          stock: newStock,
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', id);
-      
+        .eq("id", id);
+
       if (updateError) throw updateError;
     }
-    
+
     return true;
   } catch (error) {
-    handleSupabaseError(error, 'Error al actualizar stock');
+    handleSupabaseError(error, "Error al actualizar stock");
     return false;
   }
 }
@@ -287,12 +293,10 @@ export async function updateProductStock(id: string, quantity: number): Promise<
 // Employees
 export async function getEmployees(): Promise<Employee[]> {
   try {
-    const { data, error } = await supabase
-      .from('employees')
-      .select('*');
-    
+    const { data, error } = await supabase.from("employees").select("*");
+
     if (error) throw error;
-    return (data || []).map(e => ({
+    return (data || []).map((e) => ({
       id: e.id,
       name: e.name,
       position: e.position,
@@ -301,7 +305,7 @@ export async function getEmployees(): Promise<Employee[]> {
       createdAt: e.created_at,
     }));
   } catch (error) {
-    handleSupabaseError(error, 'Error al cargar empleados');
+    handleSupabaseError(error, "Error al cargar empleados");
     return [];
   }
 }
@@ -312,7 +316,7 @@ export async function getActiveEmployees(): Promise<Employee[]> {
 }
 
 export async function saveEmployee(
-  employee: Omit<Employee, 'id' | 'createdAt'>
+  employee: Omit<Employee, "id" | "createdAt">,
 ): Promise<Employee> {
   try {
     const newEmployee = {
@@ -322,15 +326,15 @@ export async function saveEmployee(
       is_active: employee.isActive,
       created_at: new Date().toISOString(),
     };
-    
+
     const { data, error } = await supabase
-      .from('employees')
+      .from("employees")
       .insert(newEmployee)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return {
       id: data.id,
       name: data.name,
@@ -340,32 +344,33 @@ export async function saveEmployee(
       createdAt: data.created_at,
     };
   } catch (error) {
-    handleSupabaseError(error, 'Error al guardar empleado');
+    handleSupabaseError(error, "Error al guardar empleado");
     throw error;
   }
 }
 
 export async function updateEmployee(
   id: string,
-  updates: Partial<Employee>
+  updates: Partial<Employee>,
 ): Promise<Employee | null> {
   try {
     const updateData: any = {};
-    
+
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.position !== undefined) updateData.position = updates.position;
-    if (updates.dailyPayBase !== undefined) updateData.daily_pay_base = updates.dailyPayBase;
+    if (updates.dailyPayBase !== undefined)
+      updateData.daily_pay_base = updates.dailyPayBase;
     if (updates.isActive !== undefined) updateData.is_active = updates.isActive;
-    
+
     const { data, error } = await supabase
-      .from('employees')
+      .from("employees")
       .update(updateData)
-      .eq('id', id)
+      .eq("id", id)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return {
       id: data.id,
       name: data.name,
@@ -375,7 +380,7 @@ export async function updateEmployee(
       createdAt: data.created_at,
     };
   } catch (error) {
-    handleSupabaseError(error, 'Error al actualizar empleado');
+    handleSupabaseError(error, "Error al actualizar empleado");
     return null;
   }
 }
@@ -383,14 +388,14 @@ export async function updateEmployee(
 export async function deleteEmployee(id: string): Promise<boolean> {
   try {
     const { error } = await supabase
-      .from('employees')
+      .from("employees")
       .update({ is_active: false })
-      .eq('id', id);
-    
+      .eq("id", id);
+
     if (error) throw error;
     return true;
   } catch (error) {
-    handleSupabaseError(error, 'Error al eliminar empleado');
+    handleSupabaseError(error, "Error al eliminar empleado");
     return false;
   }
 }
@@ -399,12 +404,12 @@ export async function deleteEmployee(id: string): Promise<boolean> {
 export async function getSales(): Promise<Sale[]> {
   try {
     const { data, error } = await supabase
-      .from('sales')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
+      .from("sales")
+      .select("*")
+      .order("created_at", { ascending: false });
+
     if (error) throw error;
-    return (data || []).map(s => ({
+    return (data || []).map((s) => ({
       id: s.id,
       items: s.items,
       subtotal: parseFloat(s.subtotal),
@@ -420,7 +425,7 @@ export async function getSales(): Promise<Sale[]> {
       cancelledBy: s.cancelled_by,
     }));
   } catch (error) {
-    handleSupabaseError(error, 'Error al cargar ventas');
+    handleSupabaseError(error, "Error al cargar ventas");
     return [];
   }
 }
@@ -429,15 +434,15 @@ export async function getTodaySales(): Promise<Sale[]> {
   try {
     const today = getTodayDate();
     const { data, error } = await supabase
-      .from('sales')
-      .select('*')
-      .gte('created_at', `${today}T00:00:00Z`)
-      .lt('created_at', `${today}T23:59:59Z`)
-      .eq('status', 'completed')
-      .order('created_at', { ascending: false });
-    
+      .from("sales")
+      .select("*")
+      .gte("created_at", `${today}T00:00:00Z`)
+      .lt("created_at", `${today}T23:59:59Z`)
+      .eq("status", "completed")
+      .order("created_at", { ascending: false });
+
     if (error) throw error;
-    return (data || []).map(s => ({
+    return (data || []).map((s) => ({
       id: s.id,
       items: s.items,
       subtotal: parseFloat(s.subtotal),
@@ -453,25 +458,26 @@ export async function getTodaySales(): Promise<Sale[]> {
       cancelledBy: s.cancelled_by,
     }));
   } catch (error) {
-    handleSupabaseError(error, 'Error al cargar ventas del día');
+    handleSupabaseError(error, "Error al cargar ventas del día");
     return [];
   }
 }
 
 export async function saveSale(
-  sale: Omit<Sale, 'id' | 'createdAt' | 'status'>
+  sale: Omit<Sale, "id" | "createdAt" | "status">,
 ): Promise<Sale | null> {
   try {
     // Check if daily closure exists
     if (await hasDailyClosure()) {
       return null;
     }
-    
+
     // Calcular cambio devuelto si aplica
-    const cashReturned = sale.cashReceived > sale.cashAmount 
-      ? sale.cashReceived - sale.cashAmount 
-      : 0;
-    
+    const cashReturned =
+      sale.cashReceived > sale.cashAmount
+        ? sale.cashReceived - sale.cashAmount
+        : 0;
+
     const newSale = {
       items: sale.items,
       subtotal: sale.subtotal,
@@ -481,23 +487,32 @@ export async function saveSale(
       cash_received: sale.cashReceived,
       cash_returned: cashReturned,
       payment_method: sale.paymentMethod,
-      status: 'completed',
+      status: "completed",
       created_at: new Date().toISOString(),
     };
-    
+
     const { data, error } = await supabase
-      .from('sales')
+      .from("sales")
       .insert(newSale)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     // Update stock for products with inventory control
     for (const item of sale.items) {
       await updateProductStock(item.productId, item.quantity);
     }
-    
+
+    // REGISTRAR TRANSFERENCIA EN CAJA MAYOR si existe
+    if (sale.transferAmount > 0) {
+      await registerTransferIncome(
+        sale.transferAmount,
+        `Venta #${data.id.slice(-6)}`,
+        "system"
+      );
+    }
+
     return {
       id: data.id,
       items: data.items,
@@ -511,48 +526,61 @@ export async function saveSale(
       status: data.status,
       createdAt: data.created_at,
     };
+    
   } catch (error) {
-    handleSupabaseError(error, 'Error al guardar venta');
+    handleSupabaseError(error, "Error al guardar venta");
     return null;
   }
 }
 
-export async function cancelSale(id: string, cancelledBy: string): Promise<Sale | null> {
+export async function cancelSale(
+  id: string,
+  cancelledBy: string,
+): Promise<Sale | null> {
   try {
     // Primero obtenemos la venta
     const { data: sale, error: fetchError } = await supabase
-      .from('sales')
-      .select('*')
-      .eq('id', id)
+      .from("sales")
+      .select("*")
+      .eq("id", id)
       .single();
-    
+
     if (fetchError) throw fetchError;
-    
+
     // Actualizamos la venta
     const { data, error } = await supabase
-      .from('sales')
-      .update({ 
-        status: 'cancelled',
+      .from("sales")
+      .update({
+        status: "cancelled",
         cancelled_at: new Date().toISOString(),
         cancelled_by: cancelledBy,
       })
-      .eq('id', id)
+      .eq("id", id)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     // Restaurar stock para productos con control de inventario
     const products = await getProducts();
     const saleItems: SaleItem[] = sale.items;
-    
+
     for (const item of saleItems) {
-      const product = products.find(p => p.id === item.productId);
+      const product = products.find((p) => p.id === item.productId);
       if (product && product.hasInventoryControl) {
         await updateProductStock(item.productId, -item.quantity); // Restar negativo = sumar
       }
     }
-    
+
+    // REVERTIR TRANSFERENCIA EN CAJA MAYOR si existía
+    if (sale.transfer_amount > 0) {
+      await registerTransferExpense(
+        sale.transfer_amount,
+        `ANULACIÓN Venta #${sale.id.slice(-6)}`,
+        cancelledBy
+      );
+    }
+
     return {
       id: data.id,
       items: data.items,
@@ -569,31 +597,31 @@ export async function cancelSale(id: string, cancelledBy: string): Promise<Sale 
       cancelledBy: data.cancelled_by,
     };
   } catch (error) {
-    handleSupabaseError(error, 'Error al cancelar venta');
+    handleSupabaseError(error, "Error al cancelar venta");
     return null;
   }
 }
-
-
 
 // Expenses
 export async function getExpenses(): Promise<Expense[]> {
   try {
     const { data, error } = await supabase
-      .from('expenses')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
+      .from("expenses")
+      .select("*")
+      .order("created_at", { ascending: false });
+
     if (error) throw error;
-    return (data || []).map(e => ({
+    return (data || []).map((e) => ({
       id: e.id,
       description: e.description,
       amount: parseFloat(e.amount),
       category: e.category,
+      paymentMethod: e.payment_method, // Nueva propiedad
+      fromCashRegister: e.from_cash_register, // Nueva propiedad
       createdAt: e.created_at,
     }));
   } catch (error) {
-    handleSupabaseError(error, 'Error al cargar gastos');
+    handleSupabaseError(error, "Error al cargar gastos");
     return [];
   }
 }
@@ -602,74 +630,94 @@ export async function getTodayExpenses(): Promise<Expense[]> {
   try {
     const today = getTodayDate();
     const { data, error } = await supabase
-      .from('expenses')
-      .select('*')
-      .gte('created_at', `${today}T00:00:00Z`)
-      .lt('created_at', `${today}T23:59:59Z`)
-      .order('created_at', { ascending: false });
-    
+      .from("expenses")
+      .select("*")
+      .gte("created_at", `${today}T00:00:00Z`)
+      .lt("created_at", `${today}T23:59:59Z`)
+      .order("created_at", { ascending: false });
+
     if (error) throw error;
-    return (data || []).map(e => ({
+    return (data || []).map((e) => ({
       id: e.id,
       description: e.description,
       amount: parseFloat(e.amount),
       category: e.category,
+      paymentMethod: e.payment_method, // Nueva propiedad
+      fromCashRegister: e.from_cash_register, // Nueva propiedad
       createdAt: e.created_at,
     }));
   } catch (error) {
-    handleSupabaseError(error, 'Error al cargar gastos del día');
+    handleSupabaseError(error, "Error al cargar gastos del día");
     return [];
   }
 }
 
 export async function saveExpense(
-  expense: Omit<Expense, 'id' | 'createdAt'>
+  expense: Omit<Expense, "id" | "createdAt">,
 ): Promise<Expense | null> {
   try {
     // Check if daily closure exists
     if (await hasDailyClosure()) {
       return null;
     }
-    
+
     const newExpense = {
       description: expense.description,
       amount: expense.amount,
       category: expense.category,
+      payment_method: expense.paymentMethod,
+      from_cash_register: expense.fromCashRegister || false,
       created_at: new Date().toISOString(),
     };
-    
+
     const { data, error } = await supabase
-      .from('expenses')
+      .from("expenses")
       .insert(newExpense)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
+    // REGISTRAR EN CAJA MAYOR según método de pago
+    if (expense.paymentMethod === "transfer") {
+      // Gasto por transferencia → resta de Transferencias
+      await registerTransferExpense(
+        expense.amount,
+        `Gasto: ${expense.description}`,
+        "system"
+      );
+    } else if (expense.paymentMethod === "cash" && !expense.fromCashRegister) {
+      // Gasto en efectivo fuera de caja → resta de Efectivo Guardado
+      await registerSavedCashExpense(
+        expense.amount,
+        `Gasto externo: ${expense.description}`,
+        "system"
+      );
+    }
+    // Si es efectivo de caja, no se registra en caja mayor (solo afecta caja menor)
+
     return {
       id: data.id,
       description: data.description,
       amount: parseFloat(data.amount),
       category: data.category,
+      paymentMethod: data.payment_method,
+      fromCashRegister: data.from_cash_register,
       createdAt: data.created_at,
     };
   } catch (error) {
-    handleSupabaseError(error, 'Error al guardar gasto');
+    handleSupabaseError(error, "Error al guardar gasto");
     return null;
   }
 }
-
 export async function deleteExpense(id: string): Promise<boolean> {
   try {
-    const { error } = await supabase
-      .from('expenses')
-      .delete()
-      .eq('id', id);
-    
+    const { error } = await supabase.from("expenses").delete().eq("id", id);
+
     if (error) throw error;
     return true;
   } catch (error) {
-    handleSupabaseError(error, 'Error al eliminar gasto');
+    handleSupabaseError(error, "Error al eliminar gasto");
     return false;
   }
 }
@@ -678,12 +726,12 @@ export async function deleteExpense(id: string): Promise<boolean> {
 export async function getEmployeePayments(): Promise<EmployeePayment[]> {
   try {
     const { data, error } = await supabase
-      .from('employee_payments')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
+      .from("employee_payments")
+      .select("*")
+      .order("created_at", { ascending: false });
+
     if (error) throw error;
-    return (data || []).map(p => ({
+    return (data || []).map((p) => ({
       id: p.id,
       employeeId: p.employee_id,
       employeeName: p.employee_name,
@@ -691,11 +739,12 @@ export async function getEmployeePayments(): Promise<EmployeePayment[]> {
       baseAmount: parseFloat(p.base_amount),
       finalAmount: parseFloat(p.final_amount),
       notes: p.notes,
+      paymentMethod: p.payment_method, // Nueva propiedad
       fromCashRegister: p.from_cash_register,
       createdAt: p.created_at,
     }));
   } catch (error) {
-    handleSupabaseError(error, 'Error al cargar pagos de empleados');
+    handleSupabaseError(error, "Error al cargar pagos de empleados");
     return [];
   }
 }
@@ -704,14 +753,14 @@ export async function getTodayEmployeePayments(): Promise<EmployeePayment[]> {
   try {
     const today = getTodayDate();
     const { data, error } = await supabase
-      .from('employee_payments')
-      .select('*')
-      .gte('created_at', `${today}T00:00:00Z`)
-      .lt('created_at', `${today}T23:59:59Z`)
-      .order('created_at', { ascending: false });
-    
+      .from("employee_payments")
+      .select("*")
+      .gte("created_at", `${today}T00:00:00Z`)
+      .lt("created_at", `${today}T23:59:59Z`)
+      .order("created_at", { ascending: false });
+
     if (error) throw error;
-    return (data || []).map(p => ({
+    return (data || []).map((p) => ({
       id: p.id,
       employeeId: p.employee_id,
       employeeName: p.employee_name,
@@ -719,24 +768,25 @@ export async function getTodayEmployeePayments(): Promise<EmployeePayment[]> {
       baseAmount: parseFloat(p.base_amount),
       finalAmount: parseFloat(p.final_amount),
       notes: p.notes,
+      paymentMethod: p.payment_method, // Nueva propiedad
       fromCashRegister: p.from_cash_register,
       createdAt: p.created_at,
     }));
   } catch (error) {
-    handleSupabaseError(error, 'Error al cargar pagos del día');
+    handleSupabaseError(error, "Error al cargar pagos del día");
     return [];
   }
 }
 
 export async function saveEmployeePayment(
-  payment: Omit<EmployeePayment, 'id' | 'createdAt'>
+  payment: Omit<EmployeePayment, "id" | "createdAt">,
 ): Promise<EmployeePayment | null> {
   try {
     // Check if daily closure exists
     if (await hasDailyClosure()) {
       return null;
     }
-    
+
     const newPayment = {
       employee_id: payment.employeeId,
       employee_name: payment.employeeName,
@@ -744,18 +794,37 @@ export async function saveEmployeePayment(
       base_amount: payment.baseAmount,
       final_amount: payment.finalAmount,
       notes: payment.notes,
+      payment_method: payment.paymentMethod,
       from_cash_register: payment.fromCashRegister,
       created_at: new Date().toISOString(),
     };
-    
+
     const { data, error } = await supabase
-      .from('employee_payments')
+      .from("employee_payments")
       .insert(newPayment)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
+    // REGISTRAR EN CAJA MAYOR según método de pago
+    if (payment.paymentMethod === "transfer") {
+      // Pago por transferencia → resta de Transferencias
+      await registerTransferExpense(
+        payment.finalAmount,
+        `Pago a ${payment.employeeName}`,
+        "system"
+      );
+    } else if (payment.paymentMethod === "cash" && !payment.fromCashRegister) {
+      // Pago en efectivo fuera de caja → resta de Efectivo Guardado
+      await registerSavedCashExpense(
+        payment.finalAmount,
+        `Pago externo a ${payment.employeeName}`,
+        "system"
+      );
+    }
+    // Si es efectivo de caja, no se registra en caja mayor (solo afecta caja menor)
+
     return {
       id: data.id,
       employeeId: data.employee_id,
@@ -764,11 +833,12 @@ export async function saveEmployeePayment(
       baseAmount: parseFloat(data.base_amount),
       finalAmount: parseFloat(data.final_amount),
       notes: data.notes,
+      paymentMethod: data.payment_method,
       fromCashRegister: data.from_cash_register,
       createdAt: data.created_at,
     };
   } catch (error) {
-    handleSupabaseError(error, 'Error al guardar pago de empleado');
+    handleSupabaseError(error, "Error al guardar pago de empleado");
     return null;
   }
 }
@@ -776,14 +846,14 @@ export async function saveEmployeePayment(
 export async function deleteEmployeePayment(id: string): Promise<boolean> {
   try {
     const { error } = await supabase
-      .from('employee_payments')
+      .from("employee_payments")
       .delete()
-      .eq('id', id);
-    
+      .eq("id", id);
+
     if (error) throw error;
     return true;
   } catch (error) {
-    handleSupabaseError(error, 'Error al eliminar pago de empleado');
+    handleSupabaseError(error, "Error al eliminar pago de empleado");
     return false;
   }
 }
@@ -792,12 +862,12 @@ export async function deleteEmployeePayment(id: string): Promise<boolean> {
 export async function getDailyClosures(): Promise<DailyClosure[]> {
   try {
     const { data, error } = await supabase
-      .from('daily_closures')
-      .select('*')
-      .order('date', { ascending: false });
-    
+      .from("daily_closures")
+      .select("*")
+      .order("date", { ascending: false });
+
     if (error) throw error;
-    return (data || []).map(c => ({
+    return (data || []).map((c) => ({
       id: c.id,
       date: c.date,
       sales: c.sales,
@@ -813,7 +883,7 @@ export async function getDailyClosures(): Promise<DailyClosure[]> {
       createdAt: c.created_at,
     }));
   } catch (error) {
-    handleSupabaseError(error, 'Error al cargar cierres diarios');
+    handleSupabaseError(error, "Error al cargar cierres diarios");
     return [];
   }
 }
@@ -822,7 +892,9 @@ export async function getLowStockProducts(): Promise<LowStockProduct[]> {
   try {
     const products = await getProducts();
     return products
-      .filter((p) => p.isActive && p.hasInventoryControl && p.stock <= p.minStock)
+      .filter(
+        (p) => p.isActive && p.hasInventoryControl && p.stock <= p.minStock,
+      )
       .map((p) => ({
         productId: p.id,
         productName: p.name,
@@ -831,7 +903,7 @@ export async function getLowStockProducts(): Promise<LowStockProduct[]> {
         suggestedOrder: Math.max(p.minStock * 2 - p.stock, p.minStock),
       }));
   } catch (error) {
-    console.error('Error al cargar productos con stock bajo:', error);
+    console.error("Error al cargar productos con stock bajo:", error);
     return [];
   }
 }
@@ -839,27 +911,33 @@ export async function getLowStockProducts(): Promise<LowStockProduct[]> {
 export async function createDailyClosure(): Promise<DailyClosure> {
   try {
     const today = getTodayDate();
-    
+
     // Check if closure already exists for today
     const closures = await getDailyClosures();
     const existingClosure = closures.find((c) => c.date === today);
     if (existingClosure) {
       return existingClosure;
     }
-    
+
     const todaySales = await getTodaySales();
     const todayExpenses = await getTodayExpenses();
     const todayPayments = await getTodayEmployeePayments();
-    
+
     const totalSales = todaySales.reduce((sum, s) => sum + s.total, 0);
     const totalCash = todaySales.reduce((sum, s) => sum + s.cashAmount, 0);
-    const totalTransfer = todaySales.reduce((sum, s) => sum + s.transferAmount, 0);
+    const totalTransfer = todaySales.reduce(
+      (sum, s) => sum + s.transferAmount,
+      0,
+    );
     const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
-    const totalPayments = todayPayments.reduce((sum, p) => sum + p.finalAmount, 0);
-    
+    const totalPayments = todayPayments.reduce(
+      (sum, p) => sum + p.finalAmount,
+      0,
+    );
+
     const config = await getConfig();
     const lowStockProducts = await getLowStockProducts();
-    
+
     const closure = {
       date: today,
       sales: todaySales,
@@ -874,15 +952,15 @@ export async function createDailyClosure(): Promise<DailyClosure> {
       daily_base: config.dailyBase,
       created_at: new Date().toISOString(),
     };
-    
+
     const { data, error } = await supabase
-      .from('daily_closures')
+      .from("daily_closures")
       .insert(closure)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return {
       id: data.id,
       date: data.date,
@@ -899,7 +977,7 @@ export async function createDailyClosure(): Promise<DailyClosure> {
       createdAt: data.created_at,
     };
   } catch (error) {
-    handleSupabaseError(error, 'Error al crear cierre diario');
+    handleSupabaseError(error, "Error al crear cierre diario");
     throw error;
   }
 }
@@ -908,13 +986,13 @@ export async function createDailyClosure(): Promise<DailyClosure> {
 export async function getConfig(): Promise<SystemConfig> {
   try {
     const { data, error } = await supabase
-      .from('system_config')
-      .select('*')
+      .from("system_config")
+      .select("*")
       .limit(1)
       .single();
-    
+
     if (error) throw error;
-    
+
     return {
       topN: data.top_n,
       alertEmail: data.alert_email,
@@ -926,44 +1004,56 @@ export async function getConfig(): Promise<SystemConfig> {
       reopenPassword: data.reopen_password,
     };
   } catch (error) {
-    console.error('Error al cargar configuración, usando valores por defecto:', error);
+    console.error(
+      "Error al cargar configuración, usando valores por defecto:",
+      error,
+    );
     return {
       topN: 10,
-      alertEmail: '',
-      businessName: 'Mi Restaurante',
-      businessAddress: '',
-      businessPhone: '',
-      businessNIT: '',
+      alertEmail: "",
+      businessName: "Mi Restaurante",
+      businessAddress: "",
+      businessPhone: "",
+      businessNIT: "",
       dailyBase: 500,
-      reopenPassword: '1234',
+      reopenPassword: "1234",
     };
   }
 }
 
-export async function updateConfig(updates: Partial<SystemConfig>): Promise<SystemConfig> {
+export async function updateConfig(
+  updates: Partial<SystemConfig>,
+): Promise<SystemConfig> {
   try {
     const updateData: any = {};
-    
+
     if (updates.topN !== undefined) updateData.top_n = updates.topN;
-    if (updates.alertEmail !== undefined) updateData.alert_email = updates.alertEmail;
-    if (updates.businessName !== undefined) updateData.business_name = updates.businessName;
-    if (updates.businessAddress !== undefined) updateData.business_address = updates.businessAddress;
-    if (updates.businessPhone !== undefined) updateData.business_phone = updates.businessPhone;
-    if (updates.businessNIT !== undefined) updateData.business_nit = updates.businessNIT;
-    if (updates.dailyBase !== undefined) updateData.daily_base = updates.dailyBase;
-    if (updates.reopenPassword !== undefined) updateData.reopen_password = updates.reopenPassword;
-    
+    if (updates.alertEmail !== undefined)
+      updateData.alert_email = updates.alertEmail;
+    if (updates.businessName !== undefined)
+      updateData.business_name = updates.businessName;
+    if (updates.businessAddress !== undefined)
+      updateData.business_address = updates.businessAddress;
+    if (updates.businessPhone !== undefined)
+      updateData.business_phone = updates.businessPhone;
+    if (updates.businessNIT !== undefined)
+      updateData.business_nit = updates.businessNIT;
+    if (updates.dailyBase !== undefined)
+      updateData.daily_base = updates.dailyBase;
+    if (updates.reopenPassword !== undefined)
+      updateData.reopen_password = updates.reopenPassword;
+
     updateData.updated_at = new Date().toISOString();
-    
+
     const { data, error } = await supabase
-      .from('system_config')
+      .from("system_config")
       .update(updateData)
-      .eq('id', '11111111-1111-1111-1111-111111111111')
+      .eq("id", "11111111-1111-1111-1111-111111111111")
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return {
       topN: data.top_n,
       alertEmail: data.alert_email,
@@ -975,7 +1065,7 @@ export async function updateConfig(updates: Partial<SystemConfig>): Promise<Syst
       reopenPassword: data.reopen_password,
     };
   } catch (error) {
-    handleSupabaseError(error, 'Error al actualizar configuración');
+    handleSupabaseError(error, "Error al actualizar configuración");
     throw error;
   }
 }
@@ -986,21 +1076,27 @@ export async function getDailyStats(days: number = 30): Promise<DailyStats[]> {
     const closures = await getDailyClosures();
     const today = getTodayDate();
     const stats: DailyStats[] = [];
-    
+
     // Get today's data from memory (not yet in closures)
     const todaySales = await getTodaySales();
     const todayExpenses = await getTodayExpenses();
     const todayPayments = await getTodayEmployeePayments();
-    
+
     const todayTotalSales = todaySales.reduce((sum, s) => sum + s.total, 0);
-    const todayTotalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
-    const todayTotalPayments = todayPayments.reduce((sum, p) => sum + p.finalAmount, 0);
-    
+    const todayTotalExpenses = todayExpenses.reduce(
+      (sum, e) => sum + e.amount,
+      0,
+    );
+    const todayTotalPayments = todayPayments.reduce(
+      (sum, p) => sum + p.finalAmount,
+      0,
+    );
+
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
-      
+      const dateStr = date.toISOString().split("T")[0];
+
       if (dateStr === today) {
         // Use today's data from memory
         stats.push({
@@ -1020,52 +1116,67 @@ export async function getDailyStats(days: number = 30): Promise<DailyStats[]> {
         });
       }
     }
-    
+
     return stats;
   } catch (error) {
-    console.error('Error al cargar estadísticas diarias:', error);
+    console.error("Error al cargar estadísticas diarias:", error);
     return [];
   }
 }
 
-export async function getMonthlyStats(months: number = 12): Promise<MonthlyStats[]> {
+export async function getMonthlyStats(
+  months: number = 12,
+): Promise<MonthlyStats[]> {
   try {
     const closures = await getDailyClosures();
     const today = getTodayDate();
     const currentMonth = today.slice(0, 7); // "YYYY-MM"
     const stats: MonthlyStats[] = [];
-    
+
     // Get today's data from memory
     const todaySales = await getTodaySales();
     const todayExpenses = await getTodayExpenses();
     const todayPayments = await getTodayEmployeePayments();
-    
+
     const todayTotalSales = todaySales.reduce((sum, s) => sum + s.total, 0);
-    const todayTotalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
-    const todayTotalPayments = todayPayments.reduce((sum, p) => sum + p.finalAmount, 0);
-    
+    const todayTotalExpenses = todayExpenses.reduce(
+      (sum, e) => sum + e.amount,
+      0,
+    );
+    const todayTotalPayments = todayPayments.reduce(
+      (sum, p) => sum + p.finalAmount,
+      0,
+    );
+
     for (let i = months - 1; i >= 0; i--) {
       const date = new Date();
       date.setMonth(date.getMonth() - i);
       const monthStr = date.toISOString().slice(0, 7);
-      
+
       // Filter closures for this month, excluding today if it's current month
-      const monthClosures = closures.filter((c) => 
-        c.date.startsWith(monthStr) && 
-        (monthStr !== currentMonth || c.date !== today)
+      const monthClosures = closures.filter(
+        (c) =>
+          c.date.startsWith(monthStr) &&
+          (monthStr !== currentMonth || c.date !== today),
       );
-      
+
       let monthSales = monthClosures.reduce((sum, c) => sum + c.totalSales, 0);
-      let monthExpenses = monthClosures.reduce((sum, c) => sum + c.totalExpenses, 0);
-      let monthPayments = monthClosures.reduce((sum, c) => sum + c.totalPayments, 0);
-      
+      let monthExpenses = monthClosures.reduce(
+        (sum, c) => sum + c.totalExpenses,
+        0,
+      );
+      let monthPayments = monthClosures.reduce(
+        (sum, c) => sum + c.totalPayments,
+        0,
+      );
+
       // Add today's data if it's the current month
       if (monthStr === currentMonth) {
         monthSales += todayTotalSales;
         monthExpenses += todayTotalExpenses;
         monthPayments += todayTotalPayments;
       }
-      
+
       stats.push({
         month: monthStr,
         totalSales: monthSales,
@@ -1073,23 +1184,26 @@ export async function getMonthlyStats(months: number = 12): Promise<MonthlyStats
         totalPayments: monthPayments,
       });
     }
-    
+
     return stats;
   } catch (error) {
-    console.error('Error al cargar estadísticas mensuales:', error);
+    console.error("Error al cargar estadísticas mensuales:", error);
     return [];
   }
 }
 
-export async function getTopProducts(n: number, period?: string): Promise<ProductStats[]> {
+export async function getTopProducts(
+  n: number,
+  period?: string,
+): Promise<ProductStats[]> {
   try {
     const closures = await getDailyClosures();
     const filteredClosures = period
       ? closures.filter((c) => c.date.startsWith(period))
       : closures;
-    
+
     const productMap = new Map<string, ProductStats>();
-    
+
     filteredClosures.forEach((closure) => {
       closure.sales.forEach((sale) => {
         sale.items.forEach((item: SaleItem) => {
@@ -1105,26 +1219,29 @@ export async function getTopProducts(n: number, period?: string): Promise<Produc
         });
       });
     });
-    
+
     return Array.from(productMap.values())
       .sort((a, b) => b.totalQuantity - a.totalQuantity)
       .slice(0, n);
   } catch (error) {
-    console.error('Error al cargar productos más vendidos:', error);
+    console.error("Error al cargar productos más vendidos:", error);
     return [];
   }
 }
 
-export async function getBottomProducts(n: number, period?: string): Promise<ProductStats[]> {
+export async function getBottomProducts(
+  n: number,
+  period?: string,
+): Promise<ProductStats[]> {
   try {
     const closures = await getDailyClosures();
     const filteredClosures = period
       ? closures.filter((c) => c.date.startsWith(period))
       : closures;
-    
+
     const productMap = new Map<string, ProductStats>();
     const products = await getProducts();
-    
+
     // Initialize all active products with zero sales
     products.forEach((p) => {
       productMap.set(p.id, {
@@ -1134,7 +1251,7 @@ export async function getBottomProducts(n: number, period?: string): Promise<Pro
         totalRevenue: 0,
       });
     });
-    
+
     // Add actual sales data
     filteredClosures.forEach((closure) => {
       closure.sales.forEach((sale) => {
@@ -1147,12 +1264,12 @@ export async function getBottomProducts(n: number, period?: string): Promise<Pro
         });
       });
     });
-    
+
     return Array.from(productMap.values())
       .sort((a, b) => a.totalQuantity - b.totalQuantity)
       .slice(0, n);
   } catch (error) {
-    console.error('Error al cargar productos menos vendidos:', error);
+    console.error("Error al cargar productos menos vendidos:", error);
     return [];
   }
 }
@@ -1162,11 +1279,11 @@ export async function hasDailyClosure(): Promise<boolean> {
   try {
     const today = getTodayDate();
     const { data, error } = await supabase
-      .from('daily_closures')
-      .select('id')
-      .eq('date', today)
+      .from("daily_closures")
+      .select("id")
+      .eq("date", today)
       .single();
-    
+
     // Si no hay error y hay data, existe el cierre
     return !error && data !== null;
   } catch (error) {
@@ -1181,7 +1298,7 @@ export async function initializeSampleData(): Promise<void> {
     // Check if categories already exist
     const categories = await getCategories();
     if (categories.length > 0) return;
-    
+
     // Sample categories
     const sampleCategories = [
       { name: "Pescados", color: "#0ea5e9", order: 1 },
@@ -1189,15 +1306,15 @@ export async function initializeSampleData(): Promise<void> {
       { name: "Entradas", color: "#22c55e", order: 3 },
       { name: "Bebidas", color: "#8b5cf6", order: 4 },
     ];
-    
+
     // Insert categories
     for (const cat of sampleCategories) {
       await saveCategory(cat);
     }
-    
+
     // Get saved categories
     const savedCategories = await getCategories();
-    
+
     // Sample products
     const sampleProducts = [
       {
@@ -1300,12 +1417,12 @@ export async function initializeSampleData(): Promise<void> {
         isActive: true,
       },
     ];
-    
+
     // Insert products
     for (const p of sampleProducts) {
       await saveProduct(p);
     }
-    
+
     // Sample employees
     const sampleEmployees = [
       {
@@ -1320,21 +1437,20 @@ export async function initializeSampleData(): Promise<void> {
         dailyPayBase: 400,
         isActive: true,
       },
-      { 
-        name: "Pedro López", 
-        position: "Bar", 
-        dailyPayBase: 350, 
-        isActive: true 
+      {
+        name: "Pedro López",
+        position: "Bar",
+        dailyPayBase: 350,
+        isActive: true,
       },
     ];
-    
+
     // Insert employees
     for (const e of sampleEmployees) {
       await saveEmployee(e);
     }
-    
   } catch (error) {
-    console.error('Error al inicializar datos de muestra:', error);
+    console.error("Error al inicializar datos de muestra:", error);
   }
 }
 
@@ -1348,47 +1464,49 @@ export async function reopenCashRegister(password: string): Promise<boolean> {
     if (password === config.reopenPassword) {
       const today = getTodayDate();
       const { error } = await supabase
-        .from('daily_closures')
+        .from("daily_closures")
         .delete()
-        .eq('date', today);
-      
+        .eq("date", today);
+
       if (error) throw error;
       return true;
     }
     return false;
   } catch (error) {
-    console.error('Error al reabrir caja:', error);
+    console.error("Error al reabrir caja:", error);
     return false;
   }
 }
 
 // Función para verificar credenciales con Supabase
-export async function verifyLogin(username: string, password: string): Promise<any> {
+export async function verifyLogin(
+  username: string,
+  password: string,
+): Promise<any> {
   try {
     // Opción 1: Usar función PostgreSQL (recomendado)
-    const { data, error } = await supabase
-      .rpc('verify_user_password', {
-        username_text: username,
-        password_text: password
-      });
+    const { data, error } = await supabase.rpc("verify_user_password", {
+      username_text: username,
+      password_text: password,
+    });
 
     if (error) throw error;
-    
+
     if (data && data.length > 0) {
       return {
         id: data[0].id,
         username: data[0].username,
         name: data[0].name,
-        role: data[0].role
+        role: data[0].role,
       };
     }
-    
+
     // Opción 2: Consulta directa (para desarrollo simple)
     const { data: users, error: queryError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('username', username)
-      .eq('is_active', true)
+      .from("users")
+      .select("*")
+      .eq("username", username)
+      .eq("is_active", true)
       .single();
 
     if (queryError) throw queryError;
@@ -1396,9 +1514,9 @@ export async function verifyLogin(username: string, password: string): Promise<a
     // Validación simple para desarrollo (NO para producción)
     if (users) {
       const validPasswords: Record<string, string> = {
-        'admin': 'admin123',
-        'caja': 'caja123',
-        'empleado': 'empleado123'
+        admin: "admin123",
+        caja: "caja123",
+        empleado: "empleado123",
       };
 
       if (validPasswords[username] === password) {
@@ -1406,14 +1524,14 @@ export async function verifyLogin(username: string, password: string): Promise<a
           id: users.id,
           username: users.username,
           name: users.name,
-          role: users.role
+          role: users.role,
         };
       }
     }
 
     return null;
   } catch (error) {
-    console.error('Error en verifyLogin:', error);
+    console.error("Error en verifyLogin:", error);
     return null;
   }
 }
@@ -1422,14 +1540,14 @@ export async function verifyLogin(username: string, password: string): Promise<a
 export async function updateLastLogin(userId: string): Promise<void> {
   try {
     await supabase
-      .from('users')
-      .update({ 
+      .from("users")
+      .update({
         last_login: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
-      .eq('id', userId);
+      .eq("id", userId);
   } catch (error) {
-    console.error('Error al actualizar último login:', error);
+    console.error("Error al actualizar último login:", error);
   }
 }
 
@@ -1437,16 +1555,16 @@ export async function updateLastLogin(userId: string): Promise<void> {
 export async function getUserById(userId: string): Promise<any> {
   try {
     const { data, error } = await supabase
-      .from('users')
-      .select('id, username, name, role, last_login')
-      .eq('id', userId)
-      .eq('is_active', true)
+      .from("users")
+      .select("id, username, name, role, last_login")
+      .eq("id", userId)
+      .eq("is_active", true)
       .single();
 
     if (error) throw error;
     return data;
   } catch (error) {
-    console.error('Error al obtener usuario:', error);
+    console.error("Error al obtener usuario:", error);
     return null;
   }
 }
@@ -1460,13 +1578,13 @@ export async function createUser(userData: {
 }): Promise<any> {
   try {
     const { data, error } = await supabase
-      .from('users')
+      .from("users")
       .insert({
         username: userData.username,
         name: userData.name,
         role: userData.role,
         password_hash: userData.password, // En producción, hash esta contraseña
-        is_active: true
+        is_active: true,
       })
       .select()
       .single();
@@ -1474,7 +1592,7 @@ export async function createUser(userData: {
     if (error) throw error;
     return data;
   } catch (error) {
-    console.error('Error al crear usuario:', error);
+    console.error("Error al crear usuario:", error);
     return null;
   }
 }
@@ -1482,10 +1600,10 @@ export async function createUser(userData: {
 // Funciones de permisos locales (mantener)
 export function checkPermission(requiredRoles: string[]): boolean {
   if (typeof window === "undefined") return false;
-  
+
   const userData = localStorage.getItem("pos_user");
   if (!userData) return false;
-  
+
   try {
     const user = JSON.parse(userData);
     return requiredRoles.includes(user.role);
@@ -1496,10 +1614,10 @@ export function checkPermission(requiredRoles: string[]): boolean {
 
 export function getCurrentUser() {
   if (typeof window === "undefined") return null;
-  
+
   const userData = localStorage.getItem("pos_user");
   if (!userData) return null;
-  
+
   try {
     return JSON.parse(userData);
   } catch {
@@ -1507,8 +1625,162 @@ export function getCurrentUser() {
   }
 }
 
-
 export function logout() {
   if (typeof window === "undefined") return;
   localStorage.removeItem("pos_user");
+}
+
+// Agregar estas funciones después de las demás
+
+// Caja Mayor - Cuentas
+export async function getMajorCashAccounts(): Promise<MajorCashAccount[]> {
+  try {
+    const { data, error } = await supabase
+      .from('major_cash_accounts')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return (data || []).map(a => ({
+      id: a.id,
+      type: a.type,
+      description: a.description,
+      amount: parseFloat(a.amount),
+      movementType: a.movement_type,
+      notes: a.notes,
+      createdAt: a.created_at,
+      createdBy: a.created_by,
+    }));
+  } catch (error) {
+    handleSupabaseError(error, 'Error al cargar cuentas de caja mayor');
+    return [];
+  }
+}
+
+export async function getMajorCashSummary(): Promise<MajorCashSummary> {
+  try {
+    const accounts = await getMajorCashAccounts();
+    
+    const totalTransfers = accounts
+      .filter(a => a.type === "transfer")
+      .reduce((sum, a) => a.movementType === "income" ? sum + a.amount : sum - a.amount, 0);
+    
+    const totalSavedCash = accounts
+      .filter(a => a.type === "saved_cash")
+      .reduce((sum, a) => a.movementType === "income" ? sum + a.amount : sum - a.amount, 0);
+    
+    return {
+      totalTransfers,
+      totalSavedCash,
+      totalMajorCash: totalTransfers + totalSavedCash,
+      lastUpdate: accounts.length > 0 
+        ? accounts[0].createdAt 
+        : new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error('Error al calcular resumen de caja mayor:', error);
+    return {
+      totalTransfers: 0,
+      totalSavedCash: 0,
+      totalMajorCash: 0,
+      lastUpdate: new Date().toISOString(),
+    };
+  }
+}
+
+export async function addMajorCashMovement(
+  movement: Omit<MajorCashAccount, 'id' | 'createdAt'>
+): Promise<MajorCashAccount | null> {
+  try {
+    const newMovement = {
+      type: movement.type,
+      description: movement.description,
+      amount: movement.amount,
+      movement_type: movement.movementType,
+      notes: movement.notes,
+      created_by: movement.createdBy,
+      created_at: new Date().toISOString(),
+    };
+    
+    const { data, error } = await supabase
+      .from('major_cash_accounts')
+      .insert(newMovement)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return {
+      id: data.id,
+      type: data.type,
+      description: data.description,
+      amount: parseFloat(data.amount),
+      movementType: data.movement_type,
+      notes: data.notes,
+      createdAt: data.created_at,
+      createdBy: data.created_by,
+    };
+  } catch (error) {
+    handleSupabaseError(error, 'Error al agregar movimiento de caja mayor');
+    return null;
+  }
+}
+
+export async function registerTransferIncome(amount: number, description: string, user: string) {
+  return addMajorCashMovement({
+    type: "transfer",
+    description,
+    amount,
+    movementType: "income",
+    notes: "Transferencia de venta",
+    createdBy: user,
+  });
+}
+
+export async function registerTransferExpense(amount: number, description: string, user: string) {
+  return addMajorCashMovement({
+    type: "transfer",
+    description,
+    amount,
+    movementType: "expense",
+    notes: description,
+    createdBy: user,
+  });
+}
+
+export async function registerSavedCashIncome(amount: number, description: string, user: string) {
+  return addMajorCashMovement({
+    type: "saved_cash",
+    description,
+    amount,
+    movementType: "income",
+    notes: description,
+    createdBy: user,
+  });
+}
+
+export async function registerSavedCashExpense(amount: number, description: string, user: string) {
+  return addMajorCashMovement({
+    type: "saved_cash",
+    description,
+    amount,
+    movementType: "expense",
+    notes: description,
+    createdBy: user,
+  });
+}
+
+export async function deleteMajorCashMovement(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('major_cash_accounts')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    handleSupabaseError(error, 'Error al eliminar movimiento');
+    return false;
+  }
 }

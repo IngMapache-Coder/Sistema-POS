@@ -58,9 +58,12 @@ export interface Expense {
   description: string;
   amount: number;
   category: string;
+  paymentMethod: "cash" | "transfer";
+  fromCashRegister?: boolean;
   createdAt: string;
 }
 
+// Actualizar EmployeePayment interface
 export interface EmployeePayment {
   id: string;
   employeeId: string;
@@ -69,7 +72,8 @@ export interface EmployeePayment {
   baseAmount: number;
   finalAmount: number;
   notes: string;
-  fromCashRegister: boolean;
+  paymentMethod: "cash" | "transfer";
+  fromCashRegister?: boolean;
   createdAt: string;
 }
 
@@ -132,4 +136,40 @@ export interface ProductStats {
   productName: string;
   totalQuantity: number;
   totalRevenue: number;
+}
+
+export interface PaymentMethodOption {
+  value: string;
+  label: string;
+}
+
+export const PAYMENT_METHODS: PaymentMethodOption[] = [
+  { value: "cash", label: "Efectivo" },
+  { value: "transfer", label: "Transferencia" },
+];
+
+export interface MajorCashAccount {
+  id: string;
+  type: "transfer" | "saved_cash";
+  description: string;
+  amount: number;
+  movementType: "income" | "expense";
+  notes?: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface MajorCashSummary {
+  totalTransfers: number;
+  totalSavedCash: number;
+  totalMajorCash: number;
+  lastUpdate: string;
+}
+
+export interface ManualAdjustment {
+  account: "transfer" | "saved_cash";
+  type: "income" | "expense";
+  amount: number;
+  description: string;
+  notes?: string;
 }

@@ -142,7 +142,7 @@ export default function CierrePage() {
 
   // Pagos que salieron de caja (nueva lógica)
   const paymentsFromCashRegister = todayPayments
-    .filter((p) => p.fromCashRegister)
+    .filter((p) => p.paymentMethod === "cash" && p.fromCashRegister)
     .reduce((sum, p) => sum + p.finalAmount, 0);
 
   // Pagos que NO salieron de caja
@@ -150,11 +150,23 @@ export default function CierrePage() {
     .filter((p) => !p.fromCashRegister)
     .reduce((sum, p) => sum + p.finalAmount, 0);
 
+  const expensesFromCashRegister = todayExpenses
+    .filter((e) => e.paymentMethod === "cash" && e.fromCashRegister)
+    .reduce((sum, e) => sum + e.amount, 0);
+
+  const expensesNotFromCashRegister = todayExpenses
+    .filter(
+      (e) =>
+        e.paymentMethod === "transfer" ||
+        (e.paymentMethod === "cash" && !e.fromCashRegister),
+    )
+    .reduce((sum, e) => sum + e.amount, 0);
+
   const dailyBase = config.dailyBase || 0;
 
   // Dinero esperado en caja con nueva lógica
   const expectedCashInRegister =
-    totalCash + dailyBase - paymentsFromCashRegister;
+    totalCash + dailyBase - paymentsFromCashRegister - expensesFromCashRegister;
 
   // Product summary
   const productSummary = todaySales.reduce(
@@ -602,11 +614,53 @@ export default function CierrePage() {
                       maximumFractionDigits: 0,
                     })}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {todayExpenses.length} gastos
-                  </p>
+                  <div className="text-xs text-muted-foreground space-y-1 mt-2">
+                    <div className="flex justify-between">
+                      <span>Efectivo de caja:</span>
+                      <span className="text-destructive font-medium">
+                        -$
+                        {todayExpenses
+                          .filter(
+                            (e) =>
+                              e.paymentMethod === "cash" && e.fromCashRegister,
+                          )
+                          .reduce((sum, e) => sum + e.amount, 0)
+                          .toLocaleString("en-US", {
+                            maximumFractionDigits: 0,
+                          })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Efectivo fuera caja:</span>
+                      <span>
+                        -$
+                        {todayExpenses
+                          .filter(
+                            (e) =>
+                              e.paymentMethod === "cash" && !e.fromCashRegister,
+                          )
+                          .reduce((sum, e) => sum + e.amount, 0)
+                          .toLocaleString("en-US", {
+                            maximumFractionDigits: 0,
+                          })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Transferencia:</span>
+                      <span>
+                        -$
+                        {todayExpenses
+                          .filter((e) => e.paymentMethod === "transfer")
+                          .reduce((sum, e) => sum + e.amount, 0)
+                          .toLocaleString("en-US", {
+                            maximumFractionDigits: 0,
+                          })}
+                      </span>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
+
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -622,23 +676,49 @@ export default function CierrePage() {
                         maximumFractionDigits: 0,
                       })}
                     </p>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-muted-foreground space-y-1">
                       <div className="flex justify-between">
-                        <span>De caja:</span>
+                        <span>Efectivo de caja:</span>
                         <span className="text-destructive font-medium">
                           -$
-                          {paymentsFromCashRegister.toLocaleString("en-US", {
-                            maximumFractionDigits: 0,
-                          })}
+                          {todayPayments
+                            .filter(
+                              (p) =>
+                                p.paymentMethod === "cash" &&
+                                p.fromCashRegister,
+                            )
+                            .reduce((sum, p) => sum + p.finalAmount, 0)
+                            .toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Fuera caja:</span>
+                        <span>Efectivo fuera caja:</span>
                         <span>
                           -$
-                          {paymentsNotFromCashRegister.toLocaleString("en-US", {
-                            maximumFractionDigits: 0,
-                          })}
+                          {todayPayments
+                            .filter(
+                              (p) =>
+                                p.paymentMethod === "cash" &&
+                                !p.fromCashRegister,
+                            )
+                            .reduce((sum, p) => sum + p.finalAmount, 0)
+                            .toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Transferencia:</span>
+                        <span>
+                          -$
+                          {todayPayments
+                            .filter((p) => p.paymentMethod === "transfer")
+                            .reduce((sum, p) => sum + p.finalAmount, 0)
+                            .toLocaleString("en-US", {
+                              maximumFractionDigits: 0,
+                            })}
                         </span>
                       </div>
                     </div>
@@ -684,6 +764,18 @@ export default function CierrePage() {
                       <span className="text-sm text-destructive">
                         -$
                         {paymentsFromCashRegister.toLocaleString("en-US", {
+                          maximumFractionDigits: 0,
+                        })}
+                      </span>
+                    </div>
+                    {/* LÍNEA NUEVA - Gastos en efectivo de caja */}
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">
+                        - Gastos (de caja):
+                      </span>
+                      <span className="text-sm text-destructive">
+                        -$
+                        {expensesFromCashRegister.toLocaleString("en-US", {
                           maximumFractionDigits: 0,
                         })}
                       </span>
@@ -793,13 +885,44 @@ export default function CierrePage() {
                         variant="outline"
                         className="text-xs bg-destructive/10"
                       >
-                        {todayPayments.filter((p) => p.fromCashRegister).length}{" "}
+                        {
+                          todayPayments.filter(
+                            (p) =>
+                              p.paymentMethod === "cash" && p.fromCashRegister,
+                          ).length
+                        }{" "}
                         pagos
                       </Badge>
                     </div>
                     <span className="font-semibold text-destructive">
                       -$
                       {paymentsFromCashRegister.toLocaleString("en-US", {
+                        maximumFractionDigits: 0,
+                      })}
+                    </span>
+                  </div>
+
+                  {/* LÍNEA NUEVA - Gastos en efectivo de caja */}
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-destructive/5">
+                    <div className="flex items-center gap-2">
+                      <TrendingDown className="h-4 w-4 text-destructive" />
+                      <span>- Gastos en efectivo (de caja)</span>
+                      <Badge
+                        variant="outline"
+                        className="text-xs bg-destructive/10"
+                      >
+                        {
+                          todayExpenses.filter(
+                            (e) =>
+                              e.paymentMethod === "cash" && e.fromCashRegister,
+                          ).length
+                        }{" "}
+                        gastos
+                      </Badge>
+                    </div>
+                    <span className="font-semibold text-destructive">
+                      -$
+                      {expensesFromCashRegister.toLocaleString("en-US", {
                         maximumFractionDigits: 0,
                       })}
                     </span>
@@ -826,8 +949,11 @@ export default function CierrePage() {
                       debe estar físicamente en la caja registradora.
                     </p>
                     <p>
-                      📝 Los pagos "fuera de caja" ($
-                      {paymentsNotFromCashRegister.toLocaleString("en-US", {
+                      📝 Los pagos y gastos "fuera de caja" ($
+                      {(
+                        paymentsNotFromCashRegister +
+                        expensesNotFromCashRegister
+                      ).toLocaleString("en-US", {
                         maximumFractionDigits: 0,
                       })}
                       ) no afectan este cálculo.
@@ -894,9 +1020,21 @@ export default function CierrePage() {
                       >
                         <div>
                           <span>{expense.description}</span>
-                          <Badge variant="outline" className="ml-2">
-                            {expense.category}
-                          </Badge>
+                          <div className="flex gap-2 mt-1">
+                            <Badge variant="outline" className="text-xs">
+                              {expense.category}
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${expense.paymentMethod === "transfer" ? "bg-blue-100 text-blue-800 border-blue-200" : expense.fromCashRegister ? "bg-red-100 text-red-800 border-red-200" : "bg-yellow-100 text-yellow-800 border-yellow-200"}`}
+                            >
+                              {expense.paymentMethod === "transfer"
+                                ? "Transferencia"
+                                : expense.fromCashRegister
+                                  ? "Efectivo (de caja)"
+                                  : "Efectivo (fuera caja)"}
+                            </Badge>
+                          </div>
                         </div>
                         <span className="font-semibold text-destructive">
                           -$

@@ -59,6 +59,8 @@ import {
   Briefcase,
   Wallet,
   ShieldAlert,
+  Banknote,
+  CreditCard,
 } from "lucide-react";
 
 const POSITIONS = [
@@ -96,6 +98,7 @@ export default function EmpleadosPage() {
   const [paymentForm, setPaymentForm] = useState({
     amount: 0,
     notes: "",
+    paymentMethod: "cash" as "cash" | "transfer",
     fromCashRegister: true,
   });
 
@@ -255,6 +258,7 @@ export default function EmpleadosPage() {
     setPaymentForm({
       amount: employee.dailyPayBase,
       notes: "",
+      paymentMethod: "cash",
       fromCashRegister: true,
     });
     setShowPaymentDialog(true);
@@ -291,7 +295,11 @@ export default function EmpleadosPage() {
         baseAmount: payingEmployee.dailyPayBase,
         finalAmount: paymentForm.amount,
         notes: paymentForm.notes,
-        fromCashRegister: paymentForm.fromCashRegister,
+        paymentMethod: paymentForm.paymentMethod, // Nueva propiedad
+        fromCashRegister:
+          paymentForm.paymentMethod === "cash"
+            ? paymentForm.fromCashRegister
+            : false, // Transferencia nunca sale de caja
       });
 
       toast({
@@ -847,29 +855,81 @@ export default function EmpleadosPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <Wallet className="h-4 w-4" />
-                      <Label>Salir de Caja</Label>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {paymentForm.fromCashRegister
-                        ? "Este pago se restará del dinero en caja"
-                        : "Este pago se pagará por fuera de caja"}
-                    </p>
+                {/* Método de Pago */}
+                <div className="space-y-2">
+                  <Label>Método de Pago</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant={
+                        paymentForm.paymentMethod === "cash"
+                          ? "default"
+                          : "outline"
+                      }
+                      className="h-10"
+                      onClick={() =>
+                        setPaymentForm((prev) => ({
+                          ...prev,
+                          paymentMethod: "cash",
+                          fromCashRegister:
+                            prev.paymentMethod === "cash"
+                              ? prev.fromCashRegister
+                              : true,
+                        }))
+                      }
+                    >
+                      <Banknote className="h-4 w-4 mr-2" />
+                      Efectivo
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={
+                        paymentForm.paymentMethod === "transfer"
+                          ? "default"
+                          : "outline"
+                      }
+                      className="h-10"
+                      onClick={() =>
+                        setPaymentForm((prev) => ({
+                          ...prev,
+                          paymentMethod: "transfer",
+                          fromCashRegister: false,
+                        }))
+                      }
+                    >
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      Transferencia
+                    </Button>
                   </div>
-                  <Switch
-                    checked={paymentForm.fromCashRegister}
-                    onCheckedChange={(checked) =>
-                      setPaymentForm((prev) => ({
-                        ...prev,
-                        fromCashRegister: checked,
-                      }))
-                    }
-                  />
                 </div>
 
+                {/* Opción "Salir de Caja" solo para efectivo */}
+                {paymentForm.paymentMethod === "cash" && (
+                  <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <Wallet className="h-4 w-4" />
+                        <Label>Salir de Caja</Label>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {paymentForm.fromCashRegister
+                          ? "Este pago se restará del dinero en caja"
+                          : "Este pago se pagará por fuera de caja"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={paymentForm.fromCashRegister}
+                      onCheckedChange={(checked) =>
+                        setPaymentForm((prev) => ({
+                          ...prev,
+                          fromCashRegister: checked,
+                        }))
+                      }
+                    />
+                  </div>
+                )}
+
+                {/* Notas */}
                 <div className="space-y-2">
                   <Label htmlFor="paymentNotes">Notas (opcional)</Label>
                   <Textarea
@@ -881,11 +941,12 @@ export default function EmpleadosPage() {
                         notes: e.target.value,
                       }))
                     }
-                    placeholder="Ej: Horas extra, bonificacion, descuento por llegada tarde..."
+                    placeholder="Ej: Horas extra, bonificación, descuento por llegada tarde..."
                     rows={3}
                   />
                 </div>
 
+                {/* Resumen del Pago */}
                 <div className="rounded-lg bg-primary/5 p-4 space-y-2">
                   <p className="text-sm font-medium">Resumen del Pago</p>
                   <div className="flex justify-between">
@@ -899,20 +960,39 @@ export default function EmpleadosPage() {
                       })}
                     </span>
                   </div>
+
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">
-                      Salir de caja:
+                      Método:
                     </span>
-                    <span
-                      className={`font-medium ${paymentForm.fromCashRegister ? "text-destructive" : "text-success"}`}
-                    >
-                      {paymentForm.fromCashRegister ? "SÍ" : "NO"}
+                    <span className="font-medium">
+                      {paymentForm.paymentMethod === "cash"
+                        ? "Efectivo"
+                        : "Transferencia"}
                     </span>
                   </div>
+
+                  {paymentForm.paymentMethod === "cash" && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">
+                        Salir de caja:
+                      </span>
+                      <span
+                        className={`font-medium ${paymentForm.fromCashRegister ? "text-destructive" : "text-success"}`}
+                      >
+                        {paymentForm.fromCashRegister ? "SÍ" : "NO"}
+                      </span>
+                    </div>
+                  )}
+
                   <p className="text-xs text-muted-foreground mt-2">
-                    {paymentForm.fromCashRegister
+                    {paymentForm.paymentMethod === "cash" &&
+                    paymentForm.fromCashRegister
                       ? "⚠️ Este pago se restará del dinero disponible en caja al final del día"
-                      : "✅ Este pago no afectará el dinero en caja"}
+                      : paymentForm.paymentMethod === "cash" &&
+                          !paymentForm.fromCashRegister
+                        ? "✅ Este pago no afectará el dinero en caja (pago externo)"
+                        : "✅ Transferencia: no afecta el dinero en caja"}
                   </p>
                 </div>
               </div>
