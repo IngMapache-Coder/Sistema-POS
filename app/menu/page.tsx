@@ -45,7 +45,6 @@ import {
   saveProduct,
   updateProduct,
   deleteProduct,
-  initializeSampleData,
 } from "@/lib/database";
 import type { Category, Product } from "@/lib/types";
 import {
@@ -114,7 +113,6 @@ export default function MenuPage() {
 
   const initializeData = async () => {
     try {
-      await initializeSampleData();
       await loadData();
     } catch (error) {
       console.error("Error initializing data:", error);

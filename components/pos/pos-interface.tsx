@@ -24,7 +24,6 @@ import {
   saveSale,
   getTodaySales,
   cancelSale,
-  initializeSampleData,
   hasDailyClosure,
   getConfig,
 } from "@/lib/database";
@@ -72,7 +71,6 @@ export function POSInterface() {
 
   const loadData = useCallback(async () => {
     try {
-      await initializeSampleData();
       const cats = await getCategories();
       setCategories(cats.sort((a, b) => a.order - b.order));
       if (cats.length > 0 && !selectedCategory) {

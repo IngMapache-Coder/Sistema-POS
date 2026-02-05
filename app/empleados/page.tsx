@@ -43,7 +43,6 @@ import {
   deleteEmployee,
   getTodayEmployeePayments,
   saveEmployeePayment,
-  initializeSampleData,
   hasDailyClosure,
   deleteEmployeePayment,
   getCurrentUser,
@@ -110,7 +109,6 @@ export default function EmpleadosPage() {
 
   const initializeData = async () => {
     try {
-      await initializeSampleData();
       await loadData();
     } catch (error) {
       console.error("Error initializing data:", error);

@@ -1163,7 +1163,6 @@ export async function updateConfig(
   }
 }
 
-// Statistics functions
 export async function getDailyStats(days: number = 30): Promise<DailyStats[]> {
   try {
     const closures = await getDailyClosures();
@@ -1367,7 +1366,6 @@ export async function getBottomProducts(
   }
 }
 
-// NEW FUNCTION: Check if today's closure exists
 export async function hasDailyClosure(): Promise<boolean> {
   try {
     const today = getTodayDate();
@@ -1382,168 +1380,6 @@ export async function hasDailyClosure(): Promise<boolean> {
   } catch (error) {
     // Si hay error (como ningún registro encontrado), no existe el cierre
     return false;
-  }
-}
-
-// Initialize with sample data if empty
-export async function initializeSampleData(): Promise<void> {
-  try {
-    // Check if categories already exist
-    const categories = await getCategories();
-    if (categories.length > 0) return;
-
-    // Sample categories
-    const sampleCategories = [
-      { name: "Pescados", color: "#0ea5e9", order: 1 },
-      { name: "Camarones", color: "#f97316", order: 2 },
-      { name: "Entradas", color: "#22c55e", order: 3 },
-      { name: "Bebidas", color: "#8b5cf6", order: 4 },
-    ];
-
-    // Insert categories
-    for (const cat of sampleCategories) {
-      await saveCategory(cat);
-    }
-
-    // Get saved categories
-    const savedCategories = await getCategories();
-
-    // Sample products
-    const sampleProducts = [
-      {
-        name: "Filete de Pescado",
-        price: 120,
-        categoryId: savedCategories[0].id,
-        stock: 50,
-        minStock: 10,
-        hasInventoryControl: true,
-        isActive: true,
-      },
-      {
-        name: "Pescado Entero",
-        price: 150,
-        categoryId: savedCategories[0].id,
-        stock: 30,
-        minStock: 5,
-        hasInventoryControl: true,
-        isActive: true,
-      },
-      {
-        name: "Ceviche de Pescado",
-        price: 95,
-        categoryId: savedCategories[0].id,
-        stock: 100,
-        minStock: 20,
-        hasInventoryControl: false,
-        isActive: true,
-      },
-      {
-        name: "Camarones al Ajillo",
-        price: 180,
-        categoryId: savedCategories[1].id,
-        stock: 40,
-        minStock: 10,
-        hasInventoryControl: true,
-        isActive: true,
-      },
-      {
-        name: "Camarones Empanizados",
-        price: 160,
-        categoryId: savedCategories[1].id,
-        stock: 45,
-        minStock: 10,
-        hasInventoryControl: true,
-        isActive: true,
-      },
-      {
-        name: "Coctel de Camarones",
-        price: 110,
-        categoryId: savedCategories[1].id,
-        stock: 60,
-        minStock: 15,
-        hasInventoryControl: true,
-        isActive: true,
-      },
-      {
-        name: "Tostadas de Ceviche",
-        price: 45,
-        categoryId: savedCategories[2].id,
-        stock: 200,
-        minStock: 30,
-        hasInventoryControl: false,
-        isActive: true,
-      },
-      {
-        name: "Aguachile",
-        price: 85,
-        categoryId: savedCategories[2].id,
-        stock: 80,
-        minStock: 15,
-        hasInventoryControl: false,
-        isActive: true,
-      },
-      {
-        name: "Agua Fresca",
-        price: 25,
-        categoryId: savedCategories[3].id,
-        stock: 1000,
-        minStock: 50,
-        hasInventoryControl: false,
-        isActive: true,
-      },
-      {
-        name: "Refresco",
-        price: 30,
-        categoryId: savedCategories[3].id,
-        stock: 200,
-        minStock: 30,
-        hasInventoryControl: true,
-        isActive: true,
-      },
-      {
-        name: "Cerveza",
-        price: 35,
-        categoryId: savedCategories[3].id,
-        stock: 150,
-        minStock: 20,
-        hasInventoryControl: true,
-        isActive: true,
-      },
-    ];
-
-    // Insert products
-    for (const p of sampleProducts) {
-      await saveProduct(p);
-    }
-
-    // Sample employees
-    const sampleEmployees = [
-      {
-        name: "Juan Pérez",
-        position: "Mesero",
-        dailyPayBase: 300,
-        isActive: true,
-      },
-      {
-        name: "María García",
-        position: "Cocinero",
-        dailyPayBase: 400,
-        isActive: true,
-      },
-      {
-        name: "Pedro López",
-        position: "Bar",
-        dailyPayBase: 350,
-        isActive: true,
-      },
-    ];
-
-    // Insert employees
-    for (const e of sampleEmployees) {
-      await saveEmployee(e);
-    }
-  } catch (error) {
-    console.error("Error al inicializar datos de muestra:", error);
   }
 }
 
@@ -1643,7 +1479,6 @@ export async function reopenCashRegister(password: string): Promise<{
   }
 }
 
-// Función para verificar credenciales con Supabase
 export async function verifyLogin(
   username: string,
   password: string,
@@ -1701,7 +1536,6 @@ export async function verifyLogin(
   }
 }
 
-// Función para actualizar último login
 export async function updateLastLogin(userId: string): Promise<void> {
   try {
     await supabase
@@ -1716,7 +1550,6 @@ export async function updateLastLogin(userId: string): Promise<void> {
   }
 }
 
-// Función para obtener usuario por ID
 export async function getUserById(userId: string): Promise<any> {
   try {
     const { data, error } = await supabase
@@ -1734,7 +1567,6 @@ export async function getUserById(userId: string): Promise<any> {
   }
 }
 
-// Función para crear usuario (solo admin)
 export async function createUser(userData: {
   username: string;
   name: string;
@@ -1762,7 +1594,6 @@ export async function createUser(userData: {
   }
 }
 
-// Funciones de permisos locales (mantener)
 export function checkPermission(requiredRoles: string[]): boolean {
   if (typeof window === "undefined") return false;
 
