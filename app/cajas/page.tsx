@@ -594,20 +594,18 @@ export default function CajasPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="adjustAmount">Monto</Label>
-                <Input
-                  id="adjustAmount"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={adjustForm.amount}
-                  onChange={(e) =>
-                    setAdjustForm(prev => ({ 
-                      ...prev, 
-                      amount: parseFloat(e.target.value) || 0 
-                    }))
-                  }
-                  placeholder="0"
-                />
+<InputNumber
+  id="adjustAmount"
+  value={adjustForm.amount}
+  onChange={(value) =>
+    setAdjustForm(prev => ({ 
+      ...prev, 
+      amount: value
+    }))
+  }
+  allowDecimals={false}
+  placeholder="0"
+/>
               </div>
 
               <div className="space-y-2">
