@@ -425,6 +425,11 @@ export function POSInterface() {
               margin: 0 auto;
               padding: 5px;
             }
+            .logo {
+              max-width: 80px;
+              margin: 0 auto 6px auto;
+              display: block;
+            }
             .header { 
               text-align: center; 
               margin-bottom: 10px;
@@ -433,6 +438,11 @@ export function POSInterface() {
             }
             .business-name {
               font-size: 20px;
+              font-weight: bold;
+              margin-bottom: 3px;
+            }
+            .owner-name {
+              font-size: 18px;
               font-weight: bold;
               margin-bottom: 3px;
             }
@@ -493,7 +503,9 @@ export function POSInterface() {
         </head>
         <body>
           <div class="header">
+          <img src="images/logo.jpeg" class="logo" alt="Logo" />
             <div class="business-name">${config.businessName || "RESTAURANTE"}</div>
+            <div class="owner-name">${"Elina Villegas"}</div>
             ${config.businessAddress ? `<div class="business-info">${config.businessAddress}</div>` : ""}
             ${config.businessPhone ? `<div class="business-info">Tel: ${config.businessPhone}</div>` : ""}
             ${config.businessNIT ? `<div class="business-nit">NIT: ${config.businessNIT}</div>` : ""}
