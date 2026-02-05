@@ -1484,13 +1484,14 @@ export async function verifyLogin(
   password: string,
 ): Promise<any> {
   try {
-    // Opción 1: Usar función PostgreSQL (recomendado)
     const { data, error } = await supabase.rpc("verify_user_password", {
       username_text: username,
       password_text: password,
     });
 
-    if (error) throw error;
+    if (error) {
+      throw new Error(error.message || "Error en verificación de usuario");
+    }
 
     if (data && data.length > 0) {
       return {
@@ -1501,7 +1502,6 @@ export async function verifyLogin(
       };
     }
 
-    // Opción 2: Consulta directa (para desarrollo simple)
     const { data: users, error: queryError } = await supabase
       .from("users")
       .select("*")
@@ -1509,32 +1509,32 @@ export async function verifyLogin(
       .eq("is_active", true)
       .single();
 
-    if (queryError) throw queryError;
+    if (queryError) {
+      throw new Error(queryError.message || "Error consultando usuario");
+    }
 
-    // Validación simple para desarrollo (NO para producción)
-    if (users) {
-      const validPasswords: Record<string, string> = {
-        admin: "admin123",
-        caja: "caja123",
-        empleado: "empleado123",
+    const validPasswords: Record<string, string> = {
+      admin: "admin123",
+      caja: "caja123",
+      empleado: "empleado123",
+    };
+
+    if (users && validPasswords[username] === password) {
+      return {
+        id: users.id,
+        username: users.username,
+        name: users.name,
+        role: users.role,
       };
-
-      if (validPasswords[username] === password) {
-        return {
-          id: users.id,
-          username: users.username,
-          name: users.name,
-          role: users.role,
-        };
-      }
     }
 
     return null;
   } catch (error) {
-    console.error("Error en verifyLogin:", error);
+    console.error("Error en verifyLogin:", error instanceof Error ? error.message : error);
     return null;
   }
 }
+
 
 export async function updateLastLogin(userId: string): Promise<void> {
   try {
