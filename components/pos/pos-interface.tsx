@@ -503,7 +503,7 @@ export function POSInterface() {
         </head>
         <body>
           <div class="header">
-          <img src="../../images/logo.jpeg" class="logo" alt="Logo" />
+          <img src="/images/logo.jpeg" class="logo" alt="Logo" />
             <div class="business-name">${config.businessName || "RESTAURANTE"}</div>
             <div class="owner-name">${"Elina Villegas"}</div>
             ${config.businessAddress ? `<div class="business-info">${config.businessAddress}</div>` : ""}
