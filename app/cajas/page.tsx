@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { InputNumber } from "@/components/ui/input-number";
 import { Button } from "@/components/ui/button";
 import {
   Card,
