@@ -777,22 +777,24 @@ export default function CierresHistoricosPage() {
   };
 
   const getAvailableMonths = () => {
-    const months = new Set<string>();
-    closures.forEach((closure) => {
-      const month = closure.date.substring(0, 7); // YYYY-MM
-      months.add(month);
-    });
+    if (closures.length === 0) return [];
 
-    // También agregar meses de los últimos 12 meses para el reporte mensual
-    const currentDate = new Date();
-    for (let i = 0; i < 12; i++) {
-      const date = new Date();
-      date.setMonth(currentDate.getMonth() - i);
-      const monthStr = date.toISOString().slice(0, 7);
-      months.add(monthStr);
-    }
+    // Agrupar por mes y contar cierres
+    const monthCounts = closures.reduce(
+      (acc, closure) => {
+        if (closure && closure.date) {
+          const month = closure.date.substring(0, 7);
+          acc[month] = (acc[month] || 0) + 1;
+        }
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
-    return Array.from(months).sort().reverse();
+    // Solo retornar meses que tengan al menos 1 cierre
+    return Object.keys(monthCounts)
+      .filter((month) => monthCounts[month] > 0)
+      .sort((a, b) => b.localeCompare(a));
   };
 
   const handleViewClosure = (closure: DailyClosure) => {
@@ -1598,7 +1600,6 @@ export default function CierresHistoricosPage() {
             {monthlyData && (
               <ScrollArea className="max-h-[70vh] pr-4">
                 <div className="space-y-6">
-
                   {/* Ventas Mensuales */}
                   <Card>
                     <CardHeader>
