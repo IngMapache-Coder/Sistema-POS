@@ -24,7 +24,10 @@ function generateId(): string {
 }
 
 export function getTodayDate(): string {
-  return new Date().toISOString().split("T")[0];
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+    .toISOString()
+    .split("T")[0];
 }
 
 // Categories
@@ -509,7 +512,7 @@ export async function saveSale(
       await registerTransferIncome(
         sale.transferAmount,
         `Venta #${data.id.slice(-6)}`,
-        "system"
+        "system",
       );
     }
 
@@ -526,7 +529,6 @@ export async function saveSale(
       status: data.status,
       createdAt: data.created_at,
     };
-    
   } catch (error) {
     handleSupabaseError(error, "Error al guardar venta");
     return null;
@@ -577,7 +579,7 @@ export async function cancelSale(
       await registerTransferExpense(
         sale.transfer_amount,
         `ANULACIÓN Venta #${sale.id.slice(-6)}`,
-        cancelledBy
+        cancelledBy,
       );
     }
 
@@ -684,14 +686,14 @@ export async function saveExpense(
       await registerTransferExpense(
         expense.amount,
         `Gasto: ${expense.description}`,
-        "system"
+        "system",
       );
     } else if (expense.paymentMethod === "cash" && !expense.fromCashRegister) {
       // Gasto en efectivo fuera de caja → resta de Efectivo Guardado
       await registerSavedCashExpense(
         expense.amount,
         `Gasto externo: ${expense.description}`,
-        "system"
+        "system",
       );
     }
     // Si es efectivo de caja, no se registra en caja mayor (solo afecta caja menor)
@@ -813,14 +815,14 @@ export async function saveEmployeePayment(
       await registerTransferExpense(
         payment.finalAmount,
         `Pago a ${payment.employeeName}`,
-        "system"
+        "system",
       );
     } else if (payment.paymentMethod === "cash" && !payment.fromCashRegister) {
       // Pago en efectivo fuera de caja → resta de Efectivo Guardado
       await registerSavedCashExpense(
         payment.finalAmount,
         `Pago externo a ${payment.employeeName}`,
-        "system"
+        "system",
       );
     }
     // Si es efectivo de caja, no se registra en caja mayor (solo afecta caja menor)
@@ -919,10 +921,14 @@ export async function createDailyClosure(): Promise<DailyClosure> {
       return existingClosure;
     }
 
+    // Obtener datos del día
     const todaySales = await getTodaySales();
     const todayExpenses = await getTodayExpenses();
     const todayPayments = await getTodayEmployeePayments();
+    const config = await getConfig();
+    const lowStockProducts = await getLowStockProducts();
 
+    // Cálculos básicos
     const totalSales = todaySales.reduce((sum, s) => sum + s.total, 0);
     const totalCash = todaySales.reduce((sum, s) => sum + s.cashAmount, 0);
     const totalTransfer = todaySales.reduce(
@@ -935,9 +941,49 @@ export async function createDailyClosure(): Promise<DailyClosure> {
       0,
     );
 
-    const config = await getConfig();
-    const lowStockProducts = await getLowStockProducts();
+    // Gastos en efectivo (de caja menor)
+    const cashExpenses = todayExpenses
+      .filter((e) => e.paymentMethod === "cash" && e.fromCashRegister)
+      .reduce((sum, e) => sum + e.amount, 0);
 
+    // Pagos en efectivo (de caja menor)
+    const cashPayments = todayPayments
+      .filter((p) => p.paymentMethod === "cash" && p.fromCashRegister)
+      .reduce((sum, p) => sum + p.finalAmount, 0);
+
+    // Calcular efectivo que debería haber en caja
+    const cashBeforeClosure =
+      config.dailyBase + // Base diaria
+      totalCash - // Efectivo neto de ventas
+      cashExpenses - // Gastos en efectivo
+      cashPayments; // Pagos en efectivo
+
+    // ===============================================
+    // CORRECCIÓN: SOLO TRANSFERIR, NO REGISTRAR GASTO
+    // ===============================================
+
+    // Calcular excedente para transferir
+    const excessCash = Math.max(0, cashBeforeClosure - config.dailyBase);
+
+    // Si hay excedente, SOLO transferir a caja mayor
+    if (excessCash > 0) {
+      const transferDescription = `Cierre diario ${today} - Excedente a caja mayor`;
+
+      await addMajorCashMovement({
+        type: "saved_cash",
+        description: transferDescription,
+        amount: excessCash,
+        movementType: "income",
+        notes: `Transferencia automática de cierre. Base diaria: $${config.dailyBase}, Excedente: $${excessCash}`,
+        createdBy: "system",
+      });
+
+      console.log(`Transferido $${excessCash} a Efectivo Guardado`);
+    }
+    // ===============================================
+
+    // Crear objeto de cierre
+    // En createDailyClosure(), modifica el objeto de cierre:
     const closure = {
       date: today,
       sales: todaySales,
@@ -950,6 +996,7 @@ export async function createDailyClosure(): Promise<DailyClosure> {
       total_payments: totalPayments,
       low_stock_products: lowStockProducts,
       daily_base: config.dailyBase,
+      cash_excess_transferred: excessCash, // GUARDAR EL MONTO TRANSFERIDO
       created_at: new Date().toISOString(),
     };
 
@@ -982,7 +1029,53 @@ export async function createDailyClosure(): Promise<DailyClosure> {
   }
 }
 
-// System Config
+export async function calculateDailyCashSummary(): Promise<{
+  dailyBase: number;
+  cashSales: number; // Efectivo NETO que entra a caja
+  cashExpenses: number; // Efectivo que sale de caja
+  cashPayments: number; // Efectivo que sale de caja
+  expectedCash: number; // Efectivo que debería haber
+  excessToTransfer: number; // Excedente sobre la base
+  cashReceived: number; // Solo para información (dinero recibido de clientes)
+  cashReturned: number; // Solo para información (cambio devuelto)
+}> {
+  const todaySales = await getTodaySales();
+  const todayExpenses = await getTodayExpenses();
+  const todayPayments = await getTodayEmployeePayments();
+  const config = await getConfig();
+
+  // Efectivo NETO que realmente entra a caja
+  const cashSales = todaySales.reduce((sum, s) => sum + s.cashAmount, 0);
+
+  // Solo para información (no usado en cálculos)
+  const cashReceived = todaySales.reduce((sum, s) => sum + s.cashReceived, 0);
+  const cashReturned = todaySales.reduce((sum, s) => sum + s.cashReturned, 0);
+
+  const cashExpenses = todayExpenses
+    .filter((e) => e.paymentMethod === "cash" && e.fromCashRegister)
+    .reduce((sum, e) => sum + e.amount, 0);
+
+  const cashPayments = todayPayments
+    .filter((p) => p.paymentMethod === "cash" && p.fromCashRegister)
+    .reduce((sum, p) => sum + p.finalAmount, 0);
+
+  // Cálculo CORREGIDO: El cambio devuelto NO afecta
+  const expectedCash =
+    config.dailyBase + cashSales - cashExpenses - cashPayments;
+  const excessToTransfer = Math.max(0, expectedCash - config.dailyBase);
+
+  return {
+    dailyBase: config.dailyBase,
+    cashSales,
+    cashExpenses,
+    cashPayments,
+    expectedCash,
+    excessToTransfer,
+    cashReceived, // Solo para mostrar
+    cashReturned, // Solo para mostrar
+  };
+}
+
 export async function getConfig(): Promise<SystemConfig> {
   try {
     const { data, error } = await supabase
@@ -1458,23 +1551,95 @@ export async function getCashRegisterStatus(): Promise<"open" | "closed"> {
   return (await hasDailyClosure()) ? "closed" : "open";
 }
 
-export async function reopenCashRegister(password: string): Promise<boolean> {
+export async function reopenCashRegister(password: string): Promise<{
+  success: boolean;
+  message: string;
+  revertedAmount?: number;
+}> {
   try {
     const config = await getConfig();
-    if (password === config.reopenPassword) {
-      const today = getTodayDate();
-      const { error } = await supabase
-        .from("daily_closures")
-        .delete()
-        .eq("date", today);
-
-      if (error) throw error;
-      return true;
+    const today = getTodayDate();
+    
+    // Verificar contraseña
+    if (password !== config.reopenPassword) {
+      return {
+        success: false,
+        message: "Contraseña incorrecta"
+      };
     }
-    return false;
+
+    // Buscar el cierre del día actual
+    const { data: closure, error: fetchError } = await supabase
+      .from("daily_closures")
+      .select("*, cash_excess_transferred")
+      .eq("date", today)
+      .maybeSingle();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error("Error al buscar cierre:", fetchError);
+      return {
+        success: false,
+        message: "Error al verificar cierre"
+      };
+    }
+
+    let revertedAmount = 0;
+    
+    // Si hay cierre con transferencia, revertirla
+    if (closure && closure.cash_excess_transferred > 0) {
+      revertedAmount = closure.cash_excess_transferred;
+      
+      // Revertir transferencia en caja mayor (EGRESO en "Efectivo Guardado")
+      const revertResult = await addMajorCashMovement({
+        type: "saved_cash",
+        description: `REAPERTURA - Reversión cierre ${today}`,
+        amount: revertedAmount,
+        movementType: "expense",
+        notes: `Reversión por reapertura de caja. Monto original: $${revertedAmount}`,
+        createdBy: "system",
+      });
+      
+      if (!revertResult) {
+        return {
+          success: false,
+          message: "Error al revertir transferencia de caja mayor"
+        };
+      }
+      
+      console.log(`Revertido $${revertedAmount} de Efectivo Guardado`);
+    }
+
+    // Eliminar el cierre diario
+    const { error: deleteError } = await supabase
+      .from("daily_closures")
+      .delete()
+      .eq("date", today);
+
+    if (deleteError) {
+      console.error("Error al eliminar cierre:", deleteError);
+      return {
+        success: false,
+        message: "Error al eliminar registro de cierre"
+      };
+    }
+
+    // Mensaje de éxito
+    const message = revertedAmount > 0
+      ? `✅ Caja reabierta. Se restó $${revertedAmount} de Efectivo Guardado`
+      : "✅ Caja reabierta exitosamente";
+    
+    return {
+      success: true,
+      message,
+      revertedAmount
+    };
+    
   } catch (error) {
     console.error("Error al reabrir caja:", error);
-    return false;
+    return {
+      success: false,
+      message: "❌ Error interno al reabrir caja"
+    };
   }
 }
 
@@ -1636,12 +1801,12 @@ export function logout() {
 export async function getMajorCashAccounts(): Promise<MajorCashAccount[]> {
   try {
     const { data, error } = await supabase
-      .from('major_cash_accounts')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
+      .from("major_cash_accounts")
+      .select("*")
+      .order("created_at", { ascending: false });
+
     if (error) throw error;
-    return (data || []).map(a => ({
+    return (data || []).map((a) => ({
       id: a.id,
       type: a.type,
       description: a.description,
@@ -1652,7 +1817,7 @@ export async function getMajorCashAccounts(): Promise<MajorCashAccount[]> {
       createdBy: a.created_by,
     }));
   } catch (error) {
-    handleSupabaseError(error, 'Error al cargar cuentas de caja mayor');
+    handleSupabaseError(error, "Error al cargar cuentas de caja mayor");
     return [];
   }
 }
@@ -1660,25 +1825,32 @@ export async function getMajorCashAccounts(): Promise<MajorCashAccount[]> {
 export async function getMajorCashSummary(): Promise<MajorCashSummary> {
   try {
     const accounts = await getMajorCashAccounts();
-    
+
     const totalTransfers = accounts
-      .filter(a => a.type === "transfer")
-      .reduce((sum, a) => a.movementType === "income" ? sum + a.amount : sum - a.amount, 0);
-    
+      .filter((a) => a.type === "transfer")
+      .reduce(
+        (sum, a) =>
+          a.movementType === "income" ? sum + a.amount : sum - a.amount,
+        0,
+      );
+
     const totalSavedCash = accounts
-      .filter(a => a.type === "saved_cash")
-      .reduce((sum, a) => a.movementType === "income" ? sum + a.amount : sum - a.amount, 0);
-    
+      .filter((a) => a.type === "saved_cash")
+      .reduce(
+        (sum, a) =>
+          a.movementType === "income" ? sum + a.amount : sum - a.amount,
+        0,
+      );
+
     return {
       totalTransfers,
       totalSavedCash,
       totalMajorCash: totalTransfers + totalSavedCash,
-      lastUpdate: accounts.length > 0 
-        ? accounts[0].createdAt 
-        : new Date().toISOString(),
+      lastUpdate:
+        accounts.length > 0 ? accounts[0].createdAt : new Date().toISOString(),
     };
   } catch (error) {
-    console.error('Error al calcular resumen de caja mayor:', error);
+    console.error("Error al calcular resumen de caja mayor:", error);
     return {
       totalTransfers: 0,
       totalSavedCash: 0,
@@ -1689,7 +1861,7 @@ export async function getMajorCashSummary(): Promise<MajorCashSummary> {
 }
 
 export async function addMajorCashMovement(
-  movement: Omit<MajorCashAccount, 'id' | 'createdAt'>
+  movement: Omit<MajorCashAccount, "id" | "createdAt">,
 ): Promise<MajorCashAccount | null> {
   try {
     const newMovement = {
@@ -1701,15 +1873,15 @@ export async function addMajorCashMovement(
       created_by: movement.createdBy,
       created_at: new Date().toISOString(),
     };
-    
+
     const { data, error } = await supabase
-      .from('major_cash_accounts')
+      .from("major_cash_accounts")
       .insert(newMovement)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return {
       id: data.id,
       type: data.type,
@@ -1721,12 +1893,16 @@ export async function addMajorCashMovement(
       createdBy: data.created_by,
     };
   } catch (error) {
-    handleSupabaseError(error, 'Error al agregar movimiento de caja mayor');
+    handleSupabaseError(error, "Error al agregar movimiento de caja mayor");
     return null;
   }
 }
 
-export async function registerTransferIncome(amount: number, description: string, user: string) {
+export async function registerTransferIncome(
+  amount: number,
+  description: string,
+  user: string,
+) {
   return addMajorCashMovement({
     type: "transfer",
     description,
@@ -1737,7 +1913,11 @@ export async function registerTransferIncome(amount: number, description: string
   });
 }
 
-export async function registerTransferExpense(amount: number, description: string, user: string) {
+export async function registerTransferExpense(
+  amount: number,
+  description: string,
+  user: string,
+) {
   return addMajorCashMovement({
     type: "transfer",
     description,
@@ -1748,7 +1928,11 @@ export async function registerTransferExpense(amount: number, description: strin
   });
 }
 
-export async function registerSavedCashIncome(amount: number, description: string, user: string) {
+export async function registerSavedCashIncome(
+  amount: number,
+  description: string,
+  user: string,
+) {
   return addMajorCashMovement({
     type: "saved_cash",
     description,
@@ -1759,7 +1943,11 @@ export async function registerSavedCashIncome(amount: number, description: strin
   });
 }
 
-export async function registerSavedCashExpense(amount: number, description: string, user: string) {
+export async function registerSavedCashExpense(
+  amount: number,
+  description: string,
+  user: string,
+) {
   return addMajorCashMovement({
     type: "saved_cash",
     description,
@@ -1773,14 +1961,209 @@ export async function registerSavedCashExpense(amount: number, description: stri
 export async function deleteMajorCashMovement(id: string): Promise<boolean> {
   try {
     const { error } = await supabase
-      .from('major_cash_accounts')
+      .from("major_cash_accounts")
       .delete()
-      .eq('id', id);
-    
+      .eq("id", id);
+
     if (error) throw error;
     return true;
   } catch (error) {
-    handleSupabaseError(error, 'Error al eliminar movimiento');
+    handleSupabaseError(error, "Error al eliminar movimiento");
     return false;
+  }
+}
+
+// Agrega esta función al final de database.ts
+export async function getCurrentCashInRegister(): Promise<{
+  dailyBase: number;
+  cashSalesToday: number;
+  cashExpensesToday: number;
+  cashPaymentsToday: number;
+  currentCash: number;
+  isClosed: boolean;
+  excessTransferred?: number; // NUEVO: para mostrar el excedente transferido
+}> {
+  try {
+    const config = await getConfig();
+    const todaySales = await getTodaySales();
+    const todayExpenses = await getTodayExpenses();
+    const todayPayments = await getTodayEmployeePayments();
+
+    // Verificar si ya se hizo cierre hoy
+    const hasClosure = await hasDailyClosure();
+
+    // Calcular efectivo neto de ventas de hoy
+    const cashSalesToday = todaySales.reduce((sum, s) => sum + s.cashAmount, 0);
+
+    // Gastos en efectivo de caja menor hoy
+    const cashExpensesToday = todayExpenses
+      .filter((e) => e.paymentMethod === "cash" && e.fromCashRegister)
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    // Pagos en efectivo de caja menor hoy
+    const cashPaymentsToday = todayPayments
+      .filter((p) => p.paymentMethod === "cash" && p.fromCashRegister)
+      .reduce((sum, p) => sum + p.finalAmount, 0);
+
+    // Calcular efectivo actual en caja
+    let currentCash;
+    let excessTransferred = 0;
+
+    if (hasClosure) {
+      // Si ya se hizo cierre:
+      // 1. Primero calculamos cuánto había antes del cierre
+      const cashBeforeClosure =
+        config.dailyBase +
+        cashSalesToday -
+        cashExpensesToday -
+        cashPaymentsToday;
+
+      // 2. Calculamos el excedente que se transfirió
+      excessTransferred = Math.max(0, cashBeforeClosure - config.dailyBase);
+
+      // 3. Después del cierre, solo queda la base diaria
+      currentCash = config.dailyBase;
+    } else {
+      // Si NO se hizo cierre, calcular normalmente
+      currentCash =
+        config.dailyBase +
+        cashSalesToday -
+        cashExpensesToday -
+        cashPaymentsToday;
+    }
+
+    return {
+      dailyBase: config.dailyBase,
+      cashSalesToday,
+      cashExpensesToday,
+      cashPaymentsToday,
+      currentCash,
+      isClosed: hasClosure,
+      excessTransferred: hasClosure ? excessTransferred : 0,
+    };
+  } catch (error) {
+    console.error("Error al calcular efectivo en caja:", error);
+    return {
+      dailyBase: 0,
+      cashSalesToday: 0,
+      cashExpensesToday: 0,
+      cashPaymentsToday: 0,
+      currentCash: 0,
+      isClosed: false,
+      excessTransferred: 0,
+    };
+  }
+}
+
+// Agrega estas funciones en database.ts
+
+// Obtener ventas por mes
+export async function getMonthlySales(yearMonth: string): Promise<Sale[]> {
+  try {
+    const [year, month] = yearMonth.split('-');
+    const startDate = `${yearMonth}-01T00:00:00Z`;
+    const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString();
+    
+    const { data, error } = await supabase
+      .from('sales')
+      .select('*')
+      .gte('created_at', startDate)
+      .lt('created_at', endDate)
+      .eq('status', 'completed');
+
+    if (error) throw error;
+    
+    return (data || []).map((s) => ({
+      id: s.id,
+      items: s.items,
+      subtotal: parseFloat(s.subtotal),
+      total: parseFloat(s.total),
+      cashAmount: parseFloat(s.cash_amount),
+      transferAmount: parseFloat(s.transfer_amount),
+      cashReceived: parseFloat(s.cash_received),
+      cashReturned: parseFloat(s.cash_returned),
+      paymentMethod: s.payment_method,
+      status: s.status,
+      createdAt: s.created_at,
+      cancelledAt: s.cancelled_at,
+      cancelledBy: s.cancelled_by,
+    }));
+  } catch (error) {
+    handleSupabaseError(error, "Error al cargar ventas mensuales");
+    return [];
+  }
+}
+
+// Obtener gastos por mes
+export async function getMonthlyExpenses(yearMonth: string): Promise<Expense[]> {
+  try {
+    const [year, month] = yearMonth.split('-');
+    const startDate = `${yearMonth}-01T00:00:00Z`;
+    const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString();
+    
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .gte('created_at', startDate)
+      .lt('created_at', endDate);
+
+    if (error) throw error;
+    
+    return (data || []).map((e) => ({
+      id: e.id,
+      description: e.description,
+      amount: parseFloat(e.amount),
+      category: e.category,
+      paymentMethod: e.payment_method,
+      fromCashRegister: e.from_cash_register,
+      createdAt: e.created_at,
+    }));
+  } catch (error) {
+    handleSupabaseError(error, "Error al cargar gastos mensuales");
+    return [];
+  }
+}
+
+// Obtener pagos de empleados por mes
+export async function getMonthlyEmployeePayments(yearMonth: string): Promise<EmployeePayment[]> {
+  try {
+    const [year, month] = yearMonth.split('-');
+    const startDate = `${yearMonth}-01T00:00:00Z`;
+    const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString();
+    
+    const { data, error } = await supabase
+      .from('employee_payments')
+      .select('*')
+      .gte('created_at', startDate)
+      .lt('created_at', endDate);
+
+    if (error) throw error;
+    
+    return (data || []).map((p) => ({
+      id: p.id,
+      employeeId: p.employee_id,
+      employeeName: p.employee_name,
+      position: p.position,
+      baseAmount: parseFloat(p.base_amount),
+      finalAmount: parseFloat(p.final_amount),
+      notes: p.notes,
+      paymentMethod: p.payment_method,
+      fromCashRegister: p.from_cash_register,
+      createdAt: p.created_at,
+    }));
+  } catch (error) {
+    handleSupabaseError(error, "Error al cargar pagos mensuales");
+    return [];
+  }
+}
+
+// Obtener cierres por mes (para verificar si ya existen)
+export async function getMonthlyClosures(yearMonth: string): Promise<DailyClosure[]> {
+  try {
+    const closures = await getDailyClosures();
+    return closures.filter(c => c.date.startsWith(yearMonth));
+  } catch (error) {
+    console.error("Error al obtener cierres mensuales:", error);
+    return [];
   }
 }

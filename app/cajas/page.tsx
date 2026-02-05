@@ -57,6 +57,7 @@ import {
   getConfig,
   getCurrentUser,
   checkPermission,
+  getCurrentCashInRegister,
 } from "@/lib/database";
 import type { MajorCashAccount, MajorCashSummary } from "@/lib/types";
 import {
@@ -89,6 +90,19 @@ export default function CajasPage() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [viewType, setViewType] = useState<"all" | "transfer" | "saved_cash">("all");
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [cashInRegister, setCashInRegister] = useState<{
+    dailyBase: number;
+    cashSalesToday: number;
+    cashExpensesToday: number;
+    cashPaymentsToday: number;
+    currentCash: number;
+  }>({
+    dailyBase: 0,
+    cashSalesToday: 0,
+    cashExpensesToday: 0,
+    cashPaymentsToday: 0,
+    currentCash: 0,
+  });
   const { toast } = useToast();
 
   // Form state
@@ -115,6 +129,7 @@ export default function CajasPage() {
         expensesData,
         paymentsData,
         configData,
+        cashInRegister,
       ] = await Promise.all([
         getMajorCashAccounts(),
         getMajorCashSummary(),
@@ -122,6 +137,7 @@ export default function CajasPage() {
         getTodayExpenses(),
         getTodayEmployeePayments(),
         getConfig(),
+        getCurrentCashInRegister(),
       ]);
 
       setAccounts(accountsData);
@@ -130,6 +146,7 @@ export default function CajasPage() {
       setTodayExpenses(expensesData);
       setTodayPayments(paymentsData);
       setConfig(configData);
+      setCashInRegister(cashInRegister);
     } catch (error) {
       console.error("Error loading data:", error);
       toast({
@@ -331,7 +348,7 @@ export default function CajasPage() {
             <CardContent>
               <p className="text-2xl font-bold text-success">
                 $
-                {config.dailyBase?.toLocaleString("en-US", {
+                {cashInRegister.currentCash.toLocaleString("en-US", {
                   maximumFractionDigits: 0,
                 })}
               </p>

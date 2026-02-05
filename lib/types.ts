@@ -91,6 +91,14 @@ export interface DailyClosure {
   lowStockProducts: LowStockProduct[];
   dailyBase: number;
   createdAt: string;
+  
+  // NUEVOS CAMPOS para detalle de caja
+  cashExpenses?: number;
+  cashPayments?: number;
+  cashBeforeClosure?: number;  // Efectivo ANTES del cierre
+  cashAfterClosure?: number;   // Efectivo DESPUÉS del cierre (solo base)
+  cashExcessTransferred?: number;
+  excessExpenseId?: string;    // ID del gasto que retira el excedente
 }
 
 export interface LowStockProduct {

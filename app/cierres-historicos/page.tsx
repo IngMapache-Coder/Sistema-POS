@@ -37,8 +37,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { getDailyClosures, getConfig } from "@/lib/database";
-import type { DailyClosure } from "@/lib/types";
+import {
+  getDailyClosures,
+  getConfig,
+  getMonthlySales,
+  getMonthlyExpenses,
+  getMonthlyEmployeePayments,
+} from "@/lib/database";
+import type { DailyClosure, Sale, Expense, EmployeePayment } from "@/lib/types";
 import {
   Calendar,
   Search,
@@ -53,6 +59,13 @@ import {
   Wallet,
   FileSpreadsheet,
   Printer,
+  FileText,
+  CalendarDays,
+  Banknote,
+  CreditCard,
+  Users,
+  BarChart,
+  Package,
 } from "lucide-react";
 
 export default function CierresHistoricosPage() {
@@ -62,11 +75,24 @@ export default function CierresHistoricosPage() {
     null,
   );
   const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [showMonthlyReportDialog, setShowMonthlyReportDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterMonth, setFilterMonth] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [config, setConfig] = useState<any>({ dailyBase: 0 });
+  const [selectedMonth, setSelectedMonth] = useState<string>(
+    new Date().toISOString().slice(0, 7), // YYYY-MM actual
+  );
+  const [monthlyData, setMonthlyData] = useState<{
+    sales: Sale[];
+    expenses: Expense[];
+    payments: EmployeePayment[];
+  }>({
+    sales: [],
+    expenses: [],
+    payments: [],
+  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -99,22 +125,333 @@ export default function CierresHistoricosPage() {
       });
     }
   };
-  // Añade esta función dentro de tu componente CierresHistoricosPage
+
+  const loadMonthlyData = async (month: string) => {
+    try {
+      const [sales, expenses, payments] = await Promise.all([
+        getMonthlySales(month),
+        getMonthlyExpenses(month),
+        getMonthlyEmployeePayments(month),
+      ]);
+
+      setMonthlyData({ sales, expenses, payments });
+    } catch (error) {
+      console.error("Error loading monthly data:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos mensuales",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Calcular resumen mensual
+  const calculateMonthlySummary = () => {
+    const { sales, expenses, payments } = monthlyData;
+
+    // Totales de ventas
+    const totalSales = sales.reduce((sum, s) => sum + s.total, 0);
+    const salesCash = sales.reduce((sum, s) => sum + s.cashAmount, 0);
+    const salesTransfer = sales.reduce((sum, s) => sum + s.transferAmount, 0);
+
+    // Totales de gastos
+    const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const expensesCash = expenses
+      .filter((e) => e.paymentMethod === "cash")
+      .reduce((sum, e) => sum + e.amount, 0);
+    const expensesTransfer = expenses
+      .filter((e) => e.paymentMethod === "transfer")
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    // Totales de pagos
+    const totalPayments = payments.reduce((sum, p) => sum + p.finalAmount, 0);
+    const paymentsCash = payments
+      .filter((p) => p.paymentMethod === "cash")
+      .reduce((sum, p) => sum + p.finalAmount, 0);
+    const paymentsTransfer = payments
+      .filter((p) => p.paymentMethod === "transfer")
+      .reduce((sum, p) => sum + p.finalAmount, 0);
+
+    // Totales netos
+    const totalCash = salesCash - expensesCash - paymentsCash;
+    const totalTransfer = salesTransfer - expensesTransfer - paymentsTransfer;
+    const netIncome = totalSales - totalExpenses - totalPayments;
+
+    return {
+      totalSales,
+      salesCash,
+      salesTransfer,
+      totalExpenses,
+      expensesCash,
+      expensesTransfer,
+      totalPayments,
+      paymentsCash,
+      paymentsTransfer,
+      totalCash,
+      totalTransfer,
+      netIncome,
+      daysCount: new Set(sales.map((s) => s.createdAt.split("T")[0])).size,
+      salesCount: sales.length,
+      expensesCount: expenses.length,
+      paymentsCount: payments.length,
+    };
+  };
+
+  const handleMonthlyReport = async () => {
+    await loadMonthlyData(selectedMonth);
+    setShowMonthlyReportDialog(true);
+  };
+
+  const printMonthlyReport = () => {
+    const printWindow = window.open("", "_blank", "width=400,height=800");
+    if (!printWindow) return;
+
+    const summary = calculateMonthlySummary();
+    const monthName = new Date(
+      `${selectedMonth}-01T00:00:00`,
+    ).toLocaleDateString("es-MX", {
+      month: "long",
+      year: "numeric",
+    });
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Reporte Mensual - ${selectedMonth}</title>
+          <style>
+            body { font-family: monospace; font-size: 11px; width: 280px; margin: 0 auto; padding: 10px; }
+            .header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+            .business-name {
+              font-size: 22px;
+              font-weight: bold;
+              margin-bottom: 3px;
+            }
+            .business-info {
+              font-size: 14px;
+              font-weight: bold;
+              margin-bottom: 3px;
+              color: #555;
+            }
+            .month-title {
+              font-size: 18px;
+              font-weight: bold;
+              margin: 10px 0;
+              text-align: center;
+              background: #f5f5f5;
+              padding: 5px;
+              border-radius: 4px;
+            }
+            .section { margin: 15px 0; }
+            .section-title { 
+              font-weight: bold; 
+              border-bottom: 1px solid #000; 
+              padding-bottom: 3px;
+              margin-bottom: 8px;
+              font-size: 12px;
+            }
+            .item { display: flex; justify-content: space-between; margin: 3px 0; }
+            .sub-item { 
+              display: flex; 
+              justify-content: space-between; 
+              margin: 1px 0 1px 15px; 
+              font-size: 10px; 
+              color: #555; 
+              padding: 1px 0;
+            }
+            .total-line { 
+              border-top: 1px solid #000; 
+              margin-top: 5px; 
+              padding-top: 5px; 
+              font-weight: bold; 
+            }
+            .summary-box {
+              background: #f5f5f5;
+              padding: 10px;
+              border-radius: 4px;
+              margin: 15px 0;
+              border: 1px dashed #000;
+            }
+            .summary-title {
+              font-weight: bold;
+              text-align: center;
+              margin-bottom: 8px;
+              font-size: 12px;
+            }
+            .net-result {
+              font-size: 16px;
+              font-weight: bold;
+              text-align: center;
+              margin-top: 15px;
+              padding: 10px;
+              border: 2px solid #000;
+              background: ${summary.netIncome >= 0 ? "#d1fae5" : "#fee2e2"};
+            }
+            .cash-badge {
+              background: #d1fae5;
+              color: #065f46;
+              font-size: 9px;
+              padding: 1px 4px;
+              border-radius: 3px;
+              margin-left: 5px;
+            }
+            .transfer-badge {
+              background: #dbeafe;
+              color: #1d4ed8;
+              font-size: 9px;
+              padding: 1px 4px;
+              border-radius: 3px;
+              margin-left: 5px;
+            }
+            .stats {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 5px;
+              margin: 10px 0;
+              font-size: 9px;
+              color: #666;
+            }
+            .positive { color: #059669; }
+            .negative { color: #dc2626; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="business-name">${config.businessName || "RESTAURANTE"}</div>
+            ${config.businessAddress ? `<div class="business-info">${config.businessAddress}</div>` : ""}
+            ${config.businessPhone ? `<div class="business-info">Tel: ${config.businessPhone}</div>` : ""}
+            ${config.businessNIT ? `<div class="business-nit">NIT: ${config.businessNIT}</div>` : ""}
+            <div class="business-info">REPORTE MENSUAL</div>
+          </div>
+
+          <div class="month-title">
+            ${monthName}
+          </div>
+
+          <div class="stats">
+            <div>Días con ventas: ${summary.daysCount}</div>
+            <div>Total ventas: ${summary.salesCount}</div>
+            <div>Total gastos: ${summary.expensesCount}</div>
+            <div>Total pagos: ${summary.paymentsCount}</div>
+          </div>
+
+          <!-- VENTAS -->
+          <div class="section">
+            <div class="section-title">VENTAS MENSUALES</div>
+            <div class="item">
+              <span>Total Ventas:</span>
+              <span class="positive">$${summary.totalSales.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+            </div>
+            <div class="sub-item">
+              <span>Efectivo:</span>
+              <span>$${summary.salesCash.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+            </div>
+            <div class="sub-item">
+              <span>Transferencia:</span>
+              <span>$${summary.salesTransfer.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+            </div>
+          </div>
+
+          <!-- GASTOS -->
+          <div class="section">
+            <div class="section-title">GASTOS MENSUALES</div>
+            <div class="item">
+              <span>Total Gastos:</span>
+              <span class="negative">-$${summary.totalExpenses.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+            </div>
+            <div class="sub-item">
+              <span>Efectivo:</span>
+              <span>-$${summary.expensesCash.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+            </div>
+            <div class="sub-item">
+              <span>Transferencia:</span>
+              <span>-$${summary.expensesTransfer.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+            </div>
+          </div>
+
+          <!-- PAGOS EMPLEADOS -->
+          <div class="section">
+            <div class="section-title">PAGOS EMPLEADOS</div>
+            <div class="item">
+              <span>Total Pagos:</span>
+              <span class="negative">-$${summary.totalPayments.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+            </div>
+            <div class="sub-item">
+              <span>Efectivo:</span>
+              <span>-$${summary.paymentsCash.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+            </div>
+            <div class="sub-item">
+              <span>Transferencia:</span>
+              <span>-$${summary.paymentsTransfer.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+            </div>
+          </div>
+
+          <!-- RESUMEN POR MÉTODO DE PAGO -->
+          <div class="summary-box">
+            <div class="summary-title">RESUMEN POR MÉTODO DE PAGO</div>
+            
+            <div class="item">
+              <span>EFECTIVO NETO:</span>
+              <span class="${summary.totalCash >= 0 ? "positive" : "negative"}">
+                ${summary.totalCash >= 0 ? "+" : "-"}$${Math.abs(summary.totalCash).toLocaleString("en-US", { maximumFractionDigits: 0 })}
+              </span>
+            </div>
+            <div class="sub-item">
+              <span>• Ventas efectivo:</span>
+              <span class="positive">+$${summary.salesCash.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+            </div>
+            <div class="sub-item">
+              <span>• Gastos efectivo:</span>
+              <span class="negative">-$${summary.expensesCash.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+            </div>
+            <div class="sub-item">
+              <span>• Pagos efectivo:</span>
+              <span class="negative">-$${summary.paymentsCash.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+            </div>
+
+            <div class="item" style="margin-top: 8px;">
+              <span>TRANSFERENCIA NETA:</span>
+              <span class="${summary.totalTransfer >= 0 ? "positive" : "negative"}">
+                ${summary.totalTransfer >= 0 ? "+" : "-"}$${Math.abs(summary.totalTransfer).toLocaleString("en-US", { maximumFractionDigits: 0 })}
+              </span>
+            </div>
+            <div class="sub-item">
+              <span>• Ventas transferencia:</span>
+              <span class="positive">+$${summary.salesTransfer.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+            </div>
+            <div class="sub-item">
+              <span>• Gastos transferencia:</span>
+              <span class="negative">-$${summary.expensesTransfer.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+            </div>
+            <div class="sub-item">
+              <span>• Pagos transferencia:</span>
+              <span class="negative">-$${summary.paymentsTransfer.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+            </div>
+          </div>
+
+          <!-- RESULTADO FINAL -->
+          <div class="net-result">
+            RESULTADO NETO MENSUAL<br>
+            <span style="font-size: 20px;">
+              ${summary.netIncome >= 0 ? "GANANCIA:" : "PÉRDIDA:"}
+              $${Math.abs(summary.netIncome).toLocaleString("en-US", { maximumFractionDigits: 0 })}
+            </span>
+          </div>
+
+          <div style="text-align: center; margin-top: 20px; font-size: 9px; color: #666;">
+            Reporte generado el ${new Date().toLocaleString("es-MX")}<br>
+            Sistema POS Restaurante
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   const printClosureReport = (closure: DailyClosure) => {
     const printWindow = window.open("", "_blank", "width=400,height=800");
     if (!printWindow) return;
 
-    const printDate = new Date(closure.date + "T00:00:00").toLocaleDateString(
-      "es-MX",
-      {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      },
-    );
-
-    // Calcular resumen de productos vendidos
     const productSummary = closure.sales.reduce(
       (acc, sale) => {
         sale.items.forEach((item) => {
@@ -134,7 +471,6 @@ export default function CierresHistoricosPage() {
       {} as Record<string, { name: string; quantity: number; total: number }>,
     );
 
-    // Calcular pagos de caja y fuera de caja
     const paymentsFromCashRegister = closure.employeePayments
       .filter((p) => p.fromCashRegister)
       .reduce((sum, p) => sum + p.finalAmount, 0);
@@ -143,66 +479,39 @@ export default function CierresHistoricosPage() {
       .filter((p) => !p.fromCashRegister)
       .reduce((sum, p) => sum + p.finalAmount, 0);
 
-    // Calcular dinero esperado en caja
-    const expectedCashInRegister =
-      closure.totalCash + closure.dailyBase - paymentsFromCashRegister;
-
     printWindow.document.write(`
     <html>
       <head>
         <title>Cierre de Caja - ${closure.date}</title>
         <style>
-          body { 
-            font-family: monospace; 
-            font-size: 11px; 
-            width: 280px; 
-            margin: 0 auto; 
-            padding: 10px; 
-          }
-          .header { 
-            text-align: center; 
-            margin-bottom: 15px; 
-            border-bottom: 1px dashed #000;
-            padding-bottom: 8px;
-          }
+          body { font-family: monospace; font-size: 11px; width: 280px; margin: 0 auto; padding: 10px; }
+          .header { text-align: center; margin-bottom: 15px; }
           .business-name {
-              font-size: 20px;
-              font-weight: bold;
-              margin-bottom: 3px;
-            }
-            .business-info {
-              font-size: 14px;
-              font-weight: bold;
-              margin-bottom: 3px;
-              color: #555;
-            }
-            .business-nit {
-              font-size: 14px;
-              margin-bottom: 3px;
-              color: #555;
-              font-weight: bold;
-            }
-          .section { 
-            margin: 15px 0; 
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 3px;
           }
+          .business-info {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 3px;
+            color: #555;
+          }
+          .business-nit {
+            font-size: 14px;
+            margin-bottom: 3px;
+            color: #555;
+            font-weight: bold;
+          }
+          .section { margin: 15px 0; }
           .section-title { 
             font-weight: bold; 
             border-bottom: 1px dashed #000; 
             padding-bottom: 3px;
             margin-bottom: 8px;
           }
-          .item { 
-            display: flex; 
-            justify-content: space-between; 
-            margin: 3px 0; 
-          }
-          .sub-item { 
-            display: flex; 
-            justify-content: space-between; 
-            margin: 1px 0 1px 15px; 
-            font-size: 10px; 
-            color: #555; 
-          }
+          .item { display: flex; justify-content: space-between; margin: 3px 0; }
+          .sub-item { display: flex; justify-content: space-between; margin: 1px 0 1px 15px; font-size: 10px; color: #555; }
           .total-line { 
             border-top: 1px dashed #000; 
             margin-top: 5px; 
@@ -220,6 +529,13 @@ export default function CierresHistoricosPage() {
             justify-content: space-between;
             margin: 2px 0;
           }
+          .net-income { 
+            font-size: 14px; 
+            text-align: center; 
+            margin-top: 15px; 
+            padding: 10px; 
+            border: 2px solid #000; 
+          }
           .from-cash-badge {
             background: #fee2e2;
             color: #dc2626;
@@ -236,19 +552,15 @@ export default function CierresHistoricosPage() {
             border-radius: 3px;
             margin-left: 5px;
           }
-          .footer {
-            text-align: center;
-            margin-top: 20px;
+          .excess-transfer {
+            background: #d1fae5;
+            color: #065f46;
             font-size: 9px;
-            color: #666;
-            border-top: 1px dashed #000;
-            padding-top: 8px;
-          }
-          .warning-text {
-            color: #dc2626;
-            font-size: 9px;
-            font-style: italic;
+            padding: 3px 6px;
+            border-radius: 4px;
             margin-top: 5px;
+            text-align: center;
+            font-weight: bold;
           }
         </style>
       </head>
@@ -259,12 +571,10 @@ export default function CierresHistoricosPage() {
           ${config.businessPhone ? `<div class="business-info">Tel: ${config.businessPhone}</div>` : ""}
           ${config.businessNIT ? `<div class="business-nit">NIT: ${config.businessNIT}</div>` : ""}
           <div class="business-info">CIERRE DE CAJA</div>
-          <div class="business-info">${printDate}</div>
-          <div class="business-info">Fecha: ${closure.date}</div>
+          <div class="business-info">${closure.date}</div>
           <div class="business-info">Hora: ${new Date(closure.createdAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</div>
         </div>
-
-        <!-- Sección de productos vendidos -->
+        
         <div class="section">
           <div class="section-title">PRODUCTOS VENDIDOS</div>
           ${
@@ -305,41 +615,6 @@ export default function CierresHistoricosPage() {
           </div>
         </div>
 
-        <!-- Dinero en caja -->
-        <div class="cash-register-section">
-          <div class="section-title">DINERO EN CAJA</div>
-          <div class="cash-register-item">
-            <span>Base diaria:</span>
-            <span>$${closure.dailyBase.toLocaleString("en-US", {
-              maximumFractionDigits: 0,
-            })}</span>
-          </div>
-          <div class="cash-register-item">
-            <span>+ Ventas efectivo:</span>
-            <span>+$${closure.totalCash.toLocaleString("en-US", {
-              maximumFractionDigits: 0,
-            })}</span>
-          </div>
-          <div class="cash-register-item">
-            <span>- Pagos empleados (de caja):</span>
-            <span>-$${paymentsFromCashRegister.toLocaleString("en-US", {
-              maximumFractionDigits: 0,
-            })}</span>
-          </div>
-          <div class="total-line">
-            <div class="item"><span>TOTAL ESPERADO EN CAJA</span><span>$${expectedCashInRegister.toLocaleString(
-              "en-US",
-              {
-                maximumFractionDigits: 0,
-              },
-            )}</span></div>
-          </div>
-          <div class="warning-text">
-            Esta cantidad debe estar físicamente en caja
-          </div>
-        </div>
-
-        <!-- Gastos -->
         <div class="section">
           <div class="section-title">GASTOS</div>
           ${
@@ -349,7 +624,7 @@ export default function CierresHistoricosPage() {
                   .map(
                     (e) => `
                   <div class="item">
-                    <span>${e.description} ${e.category ? `(${e.category})` : ""}</span>
+                    <span>${e.description}</span>
                     <span>-$${e.amount.toLocaleString("en-US", {
                       maximumFractionDigits: 0,
                     })}</span>
@@ -368,9 +643,8 @@ export default function CierresHistoricosPage() {
           </div>
         </div>
 
-        <!-- Pagos a empleados -->
         <div class="section">
-          <div class="section-title">PAGOS A EMPLEADOS</div>
+          <div class="section-title">PAGOS EMPLEADOS</div>
           ${
             closure.employeePayments.length === 0
               ? "<div>Sin pagos registrados</div>"
@@ -387,7 +661,6 @@ export default function CierresHistoricosPage() {
                       maximumFractionDigits: 0,
                     })}</span>
                   </div>
-                  ${p.notes ? `<div class="sub-item">Nota: ${p.notes}</div>` : ""}
                 `,
                   )
                   .join("")
@@ -414,9 +687,42 @@ export default function CierresHistoricosPage() {
           </div>
         </div>
 
-        <!-- Productos con stock bajo -->
+        <div class="section">
+          <div class="section-title">RESUMEN FINANCIERO</div>
+          <div class="item">
+            <span>Ingresos totales:</span>
+            <span>+$${closure.totalSales.toLocaleString("en-US", {
+              maximumFractionDigits: 0,
+            })}</span>
+          </div>
+          <div class="item">
+            <span>Gastos totales:</span>
+            <span>-$${closure.totalExpenses.toLocaleString("en-US", {
+              maximumFractionDigits: 0,
+            })}</span>
+          </div>
+          <div class="item">
+            <span>Pagos totales:</span>
+            <span>-$${closure.totalPayments.toLocaleString("en-US", {
+              maximumFractionDigits: 0,
+            })}</span>
+          </div>
+          <div class="total-line">
+            <div class="item">
+              <span>GANANCIA NETA:</span>
+              <span>$${(
+                closure.totalSales -
+                closure.totalExpenses -
+                closure.totalPayments
+              ).toLocaleString("en-US", {
+                maximumFractionDigits: 0,
+              })}</span>
+            </div>
+          </div>
+        </div>
+
         ${
-          closure.lowStockProducts.length > 0
+          closure.lowStockProducts && closure.lowStockProducts.length > 0
             ? `
           <div class="section">
             <div class="section-title">PRODUCTOS CON STOCK BAJO</div>
@@ -427,10 +733,6 @@ export default function CierresHistoricosPage() {
                 <span>${product.productName}</span>
                 <span>${product.currentStock}/${product.minStock}</span>
               </div>
-              <div class="sub-item">
-                <span>Sugerido ordenar:</span>
-                <span>${product.suggestedOrder} unidades</span>
-              </div>
             `,
               )
               .join("")}
@@ -439,7 +741,7 @@ export default function CierresHistoricosPage() {
             : ""
         }
 
-        <div class="footer">
+        <div style="text-align: center; margin-top: 20px; font-size: 9px; color: #666;">
           Reporte generado el ${new Date().toLocaleString("es-MX")}<br>
           Sistema POS Restaurante
         </div>
@@ -449,6 +751,7 @@ export default function CierresHistoricosPage() {
     printWindow.document.close();
     printWindow.print();
   };
+
   const filterClosures = () => {
     let filtered = [...closures];
 
@@ -479,6 +782,16 @@ export default function CierresHistoricosPage() {
       const month = closure.date.substring(0, 7); // YYYY-MM
       months.add(month);
     });
+
+    // También agregar meses de los últimos 12 meses para el reporte mensual
+    const currentDate = new Date();
+    for (let i = 0; i < 12; i++) {
+      const date = new Date();
+      date.setMonth(currentDate.getMonth() - i);
+      const monthStr = date.toISOString().slice(0, 7);
+      months.add(monthStr);
+    }
+
     return Array.from(months).sort().reverse();
   };
 
@@ -566,11 +879,66 @@ export default function CierresHistoricosPage() {
               Consulta e imprime cierres de caja de días anteriores
             </p>
           </div>
-          <Button variant="outline" className="gap-2" onClick={exportToExcel}>
-            <FileSpreadsheet className="h-4 w-4" />
-            Exportar a Excel
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" className="gap-2" onClick={exportToExcel}>
+              <FileSpreadsheet className="h-4 w-4" />
+              Exportar Excel
+            </Button>
+            <Button className="gap-2" onClick={handleMonthlyReport}>
+              <BarChart className="h-4 w-4" />
+              Reporte Mensual
+            </Button>
+          </div>
         </div>
+
+        {/* Nueva sección para Reporte Mensual */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5" />
+              Generar Reporte Mensual
+            </CardTitle>
+            <CardDescription>
+              Selecciona un mes para generar un reporte consolidado
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Seleccionar Mes</label>
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un mes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getAvailableMonths().map((month) => {
+                      const [year, monthNum] = month.split("-");
+                      const monthName = new Date(
+                        parseInt(year),
+                        parseInt(monthNum) - 1,
+                        1,
+                      ).toLocaleDateString("es-MX", {
+                        month: "long",
+                        year: "numeric",
+                      });
+                      return (
+                        <SelectItem key={month} value={month}>
+                          {monthName}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-end">
+                <Button className="w-full gap-2" onClick={handleMonthlyReport}>
+                  <FileText className="h-4 w-4" />
+                  Ver Reporte Mensual
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Filtros y búsqueda */}
         <Card className="mb-6">
@@ -757,26 +1125,24 @@ export default function CierresHistoricosPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleViewClosure(closure)}
-                                  className="h-8 gap-1"
-                                >
-                                  <Eye className="h-3 w-3" />
-                                  Ver
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => printClosureReport(closure)}
-                                  className="h-8 gap-1"
-                                >
-                                  <Printer className="h-3 w-3" />
-                                  Imprimir
-                                </Button>
-                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleViewClosure(closure)}
+                                className="h-8 gap-1"
+                              >
+                                <Eye className="h-3 w-3" />
+                                Ver
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => printClosureReport(closure)}
+                                className="h-8 gap-1"
+                              >
+                                <Printer className="h-3 w-3" />
+                                Imprimir
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -1177,12 +1543,6 @@ export default function CierresHistoricosPage() {
             )}
 
             <div className="flex justify-end gap-2 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => setShowDetailDialog(false)}
-              >
-                Cerrar
-              </Button>
               {selectedClosure && (
                 <div className="flex gap-2">
                   <Button
@@ -1201,6 +1561,364 @@ export default function CierresHistoricosPage() {
                   </Button>
                 </div>
               )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Diálogo de Reporte Mensual */}
+        <Dialog
+          open={showMonthlyReportDialog}
+          onOpenChange={setShowMonthlyReportDialog}
+        >
+          <DialogContent
+            className="
+  w-[96vw]
+  max-w-275
+  h-[94vh]
+  flex flex-col
+  px-4
+"
+          >
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CalendarDays className="h-5 w-5" />
+                Reporte Mensual
+              </DialogTitle>
+              <DialogDescription>
+                {new Date(`${selectedMonth}-01T00:00:00`).toLocaleDateString(
+                  "es-MX",
+                  {
+                    month: "long",
+                    year: "numeric",
+                  },
+                )}
+              </DialogDescription>
+            </DialogHeader>
+
+            {monthlyData && (
+              <ScrollArea className="max-h-[70vh] pr-4">
+                <div className="space-y-6">
+
+                  {/* Ventas Mensuales */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5 text-success" />
+                        Ventas Mensuales
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-3 rounded-lg border">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Banknote className="h-4 w-4 text-green-600" />
+                              <span className="font-medium">Efectivo</span>
+                            </div>
+                            <p className="text-2xl font-bold text-green-600">
+                              $
+                              {monthlyData.sales
+                                .reduce((sum, s) => sum + s.cashAmount, 0)
+                                .toLocaleString("en-US", {
+                                  maximumFractionDigits: 0,
+                                })}
+                            </p>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {
+                                monthlyData.sales.filter(
+                                  (s) => s.cashAmount > 0,
+                                ).length
+                              }{" "}
+                              ventas en efectivo
+                            </div>
+                          </div>
+                          <div className="p-3 rounded-lg border">
+                            <div className="flex items-center gap-2 mb-2">
+                              <CreditCard className="h-4 w-4 text-blue-600" />
+                              <span className="font-medium">Transferencia</span>
+                            </div>
+                            <p className="text-2xl font-bold text-blue-600">
+                              $
+                              {monthlyData.sales
+                                .reduce((sum, s) => sum + s.transferAmount, 0)
+                                .toLocaleString("en-US", {
+                                  maximumFractionDigits: 0,
+                                })}
+                            </p>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {
+                                monthlyData.sales.filter(
+                                  (s) => s.transferAmount > 0,
+                                ).length
+                              }{" "}
+                              ventas por transferencia
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-3 rounded-lg bg-green-50 border border-green-200">
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold">
+                              Ventas totales:
+                            </span>
+                            <span className="text-xl font-bold text-success">
+                              $
+                              {monthlyData.sales
+                                .reduce((sum, s) => sum + s.total, 0)
+                                .toLocaleString("en-US", {
+                                  maximumFractionDigits: 0,
+                                })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Gastos Mensuales */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <TrendingDown className="h-5 w-5 text-destructive" />
+                        Gastos Mensuales
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-3 rounded-lg border">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Banknote className="h-4 w-4 text-red-600" />
+                              <span className="font-medium">Efectivo</span>
+                            </div>
+                            <p className="text-2xl font-bold text-destructive">
+                              $
+                              {monthlyData.expenses
+                                .filter((e) => e.paymentMethod === "cash")
+                                .reduce((sum, e) => sum + e.amount, 0)
+                                .toLocaleString("en-US", {
+                                  maximumFractionDigits: 0,
+                                })}
+                            </p>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {
+                                monthlyData.expenses.filter(
+                                  (e) => e.paymentMethod === "cash",
+                                ).length
+                              }{" "}
+                              gastos en efectivo
+                            </div>
+                          </div>
+                          <div className="p-3 rounded-lg border">
+                            <div className="flex items-center gap-2 mb-2">
+                              <CreditCard className="h-4 w-4 text-purple-600" />
+                              <span className="font-medium">Transferencia</span>
+                            </div>
+                            <p className="text-2xl font-bold text-purple-600">
+                              $
+                              {monthlyData.expenses
+                                .filter((e) => e.paymentMethod === "transfer")
+                                .reduce((sum, e) => sum + e.amount, 0)
+                                .toLocaleString("en-US", {
+                                  maximumFractionDigits: 0,
+                                })}
+                            </p>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {
+                                monthlyData.expenses.filter(
+                                  (e) => e.paymentMethod === "transfer",
+                                ).length
+                              }{" "}
+                              gastos por transferencia
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold">
+                              Gastos totales:
+                            </span>
+                            <span className="text-xl font-bold text-destructive">
+                              $
+                              {monthlyData.expenses
+                                .reduce((sum, e) => sum + e.amount, 0)
+                                .toLocaleString("en-US", {
+                                  maximumFractionDigits: 0,
+                                })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Pagos a Empleados */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Users className="h-5 w-5 text-amber-600" />
+                        Pagos a Empleados
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-3 rounded-lg border">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Banknote className="h-4 w-4 text-amber-600" />
+                              <span className="font-medium">Efectivo</span>
+                            </div>
+                            <p className="text-2xl font-bold text-amber-600">
+                              $
+                              {monthlyData.payments
+                                .filter((p) => p.paymentMethod === "cash")
+                                .reduce((sum, p) => sum + p.finalAmount, 0)
+                                .toLocaleString("en-US", {
+                                  maximumFractionDigits: 0,
+                                })}
+                            </p>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {
+                                monthlyData.payments.filter(
+                                  (p) => p.paymentMethod === "cash",
+                                ).length
+                              }{" "}
+                              pagos en efectivo
+                            </div>
+                          </div>
+                          <div className="p-3 rounded-lg border">
+                            <div className="flex items-center gap-2 mb-2">
+                              <CreditCard className="h-4 w-4 text-indigo-600" />
+                              <span className="font-medium">Transferencia</span>
+                            </div>
+                            <p className="text-2xl font-bold text-indigo-600">
+                              $
+                              {monthlyData.payments
+                                .filter((p) => p.paymentMethod === "transfer")
+                                .reduce((sum, p) => sum + p.finalAmount, 0)
+                                .toLocaleString("en-US", {
+                                  maximumFractionDigits: 0,
+                                })}
+                            </p>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {
+                                monthlyData.payments.filter(
+                                  (p) => p.paymentMethod === "transfer",
+                                ).length
+                              }{" "}
+                              pagos por transferencia
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold">
+                              Pagos totales:
+                            </span>
+                            <span className="text-xl font-bold text-amber-600">
+                              $
+                              {monthlyData.payments
+                                .reduce((sum, p) => sum + p.finalAmount, 0)
+                                .toLocaleString("en-US", {
+                                  maximumFractionDigits: 0,
+                                })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Resumen Final */}
+                  <Card className="border-primary">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <DollarSign className="h-5 w-5 text-primary" />
+                        Resumen Financiero Mensual
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {(() => {
+                        const summary = calculateMonthlySummary();
+                        return (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                  <span className="font-medium">
+                                    Efectivo neto:
+                                  </span>
+                                  <span
+                                    className={`text-lg font-bold ${summary.totalCash >= 0 ? "text-green-600" : "text-red-600"}`}
+                                  >
+                                    {summary.totalCash >= 0 ? "+" : ""}$
+                                    {summary.totalCash.toLocaleString("en-US", {
+                                      maximumFractionDigits: 0,
+                                    })}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="font-medium">
+                                    Transferencia neta:
+                                  </span>
+                                  <span
+                                    className={`text-lg font-bold ${summary.totalTransfer >= 0 ? "text-green-600" : "text-red-600"}`}
+                                  >
+                                    {summary.totalTransfer >= 0 ? "+" : ""}$
+                                    {summary.totalTransfer.toLocaleString(
+                                      "en-US",
+                                      {
+                                        maximumFractionDigits: 0,
+                                      },
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="space-y-3">
+                                <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                                  <div className="text-center">
+                                    <p className="text-sm text-muted-foreground">
+                                      Resultado neto mensual
+                                    </p>
+                                    <p
+                                      className={`text-3xl font-bold mt-2 ${summary.netIncome >= 0 ? "text-success" : "text-destructive"}`}
+                                    >
+                                      {summary.netIncome >= 0 ? "+" : ""}$
+                                      {summary.netIncome.toLocaleString(
+                                        "en-US",
+                                        {
+                                          maximumFractionDigits: 0,
+                                        },
+                                      )}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {summary.netIncome >= 0
+                                        ? "GANANCIA"
+                                        : "PÉRDIDA"}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </CardContent>
+                  </Card>
+                </div>
+              </ScrollArea>
+            )}
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowMonthlyReportDialog(false)}
+              >
+                Cerrar
+              </Button>
+              <Button onClick={printMonthlyReport} className="gap-1">
+                <Printer className="h-4 w-4" />
+                Imprimir Reporte
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
