@@ -196,18 +196,22 @@ export default function GastosPage() {
       // Ajustar fromCashRegister si es transferencia
       const expenseData = {
         ...expenseForm,
-        fromCashRegister: expenseForm.paymentMethod === "cash" 
-          ? expenseForm.fromCashRegister 
-          : false
+        fromCashRegister:
+          expenseForm.paymentMethod === "cash"
+            ? expenseForm.fromCashRegister
+            : false,
       };
 
       const savedExpense = await saveExpense(expenseData);
 
       if (savedExpense) {
-        const methodText = expenseData.paymentMethod === "cash" 
-          ? (expenseData.fromCashRegister ? "Efectivo (de caja)" : "Efectivo (fuera caja)")
-          : "Transferencia";
-        
+        const methodText =
+          expenseData.paymentMethod === "cash"
+            ? expenseData.fromCashRegister
+              ? "Efectivo (de caja)"
+              : "Efectivo (fuera caja)"
+            : "Transferencia";
+
         toast({
           title: "Gasto registrado",
           description: `Se registro un gasto de $${expenseForm.amount.toLocaleString(
@@ -272,25 +276,34 @@ export default function GastosPage() {
   const totalToday = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
   const totalAll = allExpenses.reduce((sum, e) => sum + e.amount, 0);
   const expensesFromCashRegister = todayExpenses
-    .filter(e => e.paymentMethod === "cash" && e.fromCashRegister)
+    .filter((e) => e.paymentMethod === "cash" && e.fromCashRegister)
     .reduce((sum, e) => sum + e.amount, 0);
 
   const getPaymentMethodBadge = (expense: Expense) => {
     if (expense.paymentMethod === "transfer") {
       return (
-        <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+        <Badge
+          variant="outline"
+          className="bg-blue-100 text-blue-800 border-blue-200"
+        >
           <CreditCard className="h-3 w-3 mr-1" />
           Transferencia
         </Badge>
       );
     } else {
       return expense.fromCashRegister ? (
-        <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+        <Badge
+          variant="outline"
+          className="bg-red-100 text-red-800 border-red-200"
+        >
           <Banknote className="h-3 w-3 mr-1" />
           Efectivo (de caja)
         </Badge>
       ) : (
-        <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+        <Badge
+          variant="outline"
+          className="bg-yellow-100 text-yellow-800 border-yellow-200"
+        >
           <Wallet className="h-3 w-3 mr-1" />
           Efectivo (fuera caja)
         </Badge>
@@ -340,7 +353,7 @@ export default function GastosPage() {
               </p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -362,7 +375,7 @@ export default function GastosPage() {
               </p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -385,7 +398,7 @@ export default function GastosPage() {
               </p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -397,13 +410,20 @@ export default function GastosPage() {
                 <div className="flex justify-between text-sm">
                   <span>Efectivo:</span>
                   <span>
-                    {todayExpenses.filter(e => e.paymentMethod === "cash").length}
+                    {
+                      todayExpenses.filter((e) => e.paymentMethod === "cash")
+                        .length
+                    }
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Transferencia:</span>
                   <span>
-                    {todayExpenses.filter(e => e.paymentMethod === "transfer").length}
+                    {
+                      todayExpenses.filter(
+                        (e) => e.paymentMethod === "transfer",
+                      ).length
+                    }
                   </span>
                 </div>
               </div>
@@ -497,157 +517,186 @@ export default function GastosPage() {
 
         {/* Expense Dialog */}
         <Dialog open={showExpenseDialog} onOpenChange={setShowExpenseDialog}>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-lg max-h-[85vh]">
             <DialogHeader>
               <DialogTitle>Registrar Gasto</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="expenseDescription">Descripción</Label>
-                <Input
-                  id="expenseDescription"
-                  value={expenseForm.description}
-                  onChange={(e) =>
-                    setExpenseForm((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))
-                  }
-                  placeholder="Ej: Compra de plátanos, limones, gaseosas..."
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="expenseAmount">Monto</Label>
-                  <InputNumber
-                    id="expenseAmount"
-                    value={expenseForm.amount}
-                    onChange={(value) =>
-                      setExpenseForm((prev) => ({ ...prev, amount: value }))
-                    }
-                    placeholder="0"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="expenseCategory">Categoría</Label>
-                  <Select
-                    value={expenseForm.category}
-                    onValueChange={(value) =>
-                      setExpenseForm((prev) => ({ ...prev, category: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {EXPENSE_CATEGORIES.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
 
-              {/* Método de Pago */}
-              <div className="space-y-2">
-                <Label>Método de Pago</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    variant={expenseForm.paymentMethod === "cash" ? "default" : "outline"}
-                    className="h-10"
-                    onClick={() => setExpenseForm(prev => ({ 
-                      ...prev, 
-                      paymentMethod: "cash",
-                      fromCashRegister: prev.paymentMethod === "cash" ? prev.fromCashRegister : true
-                    }))}
-                  >
-                    <Banknote className="h-4 w-4 mr-2" />
-                    Efectivo
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={expenseForm.paymentMethod === "transfer" ? "default" : "outline"}
-                    className="h-10"
-                    onClick={() => setExpenseForm(prev => ({ 
-                      ...prev, 
-                      paymentMethod: "transfer",
-                      fromCashRegister: false
-                    }))}
-                  >
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Transferencia
-                  </Button>
-                </div>
-              </div>
-
-              {/* Opción "Salir de Caja" solo para efectivo */}
-              {expenseForm.paymentMethod === "cash" && (
-                <div className="flex items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <Wallet className="h-4 w-4" />
-                      <Label>Salir de Caja</Label>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {expenseForm.fromCashRegister
-                        ? "Este gasto se restará del dinero en caja"
-                        : "Este gasto se pagará por fuera de caja"}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={expenseForm.fromCashRegister}
-                    onCheckedChange={(checked) =>
+            <ScrollArea className="max-h-[65vh] pr-4">
+              <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <Label htmlFor="expenseDescription">Descripción</Label>
+                  <Input
+                    id="expenseDescription"
+                    value={expenseForm.description}
+                    onChange={(e) =>
                       setExpenseForm((prev) => ({
                         ...prev,
-                        fromCashRegister: checked,
+                        description: e.target.value,
                       }))
                     }
+                    placeholder="Ej: Compra de plátanos, limones, gaseosas..."
                   />
                 </div>
-              )}
 
-              {/* Resumen del gasto */}
-              <div className="rounded-lg bg-primary/5 p-4 space-y-2">
-                <p className="text-sm font-medium">Resumen del Gasto</p>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Monto:</span>
-                  <span className="font-semibold">
-                    $
-                    {expenseForm.amount.toLocaleString("en-US", {
-                      maximumFractionDigits: 0,
-                    })}
-                  </span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="expenseAmount">Monto</Label>
+                    <InputNumber
+                      id="expenseAmount"
+                      value={expenseForm.amount}
+                      onChange={(value) =>
+                        setExpenseForm((prev) => ({ ...prev, amount: value }))
+                      }
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="expenseCategory">Categoría</Label>
+                    <Select
+                      value={expenseForm.category}
+                      onValueChange={(value) =>
+                        setExpenseForm((prev) => ({ ...prev, category: value }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EXPENSE_CATEGORIES.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Método:</span>
-                  <span className="font-medium">
-                    {expenseForm.paymentMethod === "cash" 
-                      ? "Efectivo" 
-                      : "Transferencia"}
-                  </span>
+
+                {/* Método de Pago */}
+                <div className="space-y-2">
+                  <Label>Método de Pago</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant={
+                        expenseForm.paymentMethod === "cash"
+                          ? "default"
+                          : "outline"
+                      }
+                      className="h-10"
+                      onClick={() =>
+                        setExpenseForm((prev) => ({
+                          ...prev,
+                          paymentMethod: "cash",
+                          fromCashRegister:
+                            prev.paymentMethod === "cash"
+                              ? prev.fromCashRegister
+                              : true,
+                        }))
+                      }
+                    >
+                      <Banknote className="h-4 w-4 mr-2" />
+                      Efectivo
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={
+                        expenseForm.paymentMethod === "transfer"
+                          ? "default"
+                          : "outline"
+                      }
+                      className="h-10"
+                      onClick={() =>
+                        setExpenseForm((prev) => ({
+                          ...prev,
+                          paymentMethod: "transfer",
+                          fromCashRegister: false,
+                        }))
+                      }
+                    >
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      Transferencia
+                    </Button>
+                  </div>
                 </div>
+
+                {/* Opción "Salir de Caja" solo para efectivo */}
                 {expenseForm.paymentMethod === "cash" && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Salir de caja:</span>
-                    <span className={`font-medium ${expenseForm.fromCashRegister ? "text-destructive" : "text-muted-foreground"}`}>
-                      {expenseForm.fromCashRegister ? "SÍ" : "NO"}
-                    </span>
+                  <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <Wallet className="h-4 w-4" />
+                        <Label>Salir de Caja</Label>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {expenseForm.fromCashRegister
+                          ? "Este gasto se restará del dinero en caja"
+                          : "Este gasto se pagará por fuera de caja"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={expenseForm.fromCashRegister}
+                      onCheckedChange={(checked) =>
+                        setExpenseForm((prev) => ({
+                          ...prev,
+                          fromCashRegister: checked,
+                        }))
+                      }
+                    />
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground mt-2">
-                  {expenseForm.paymentMethod === "cash" && expenseForm.fromCashRegister
-                    ? "⚠️ Este gasto se restará del dinero disponible en caja al final del día"
-                    : expenseForm.paymentMethod === "cash" && !expenseForm.fromCashRegister
-                    ? "✅ Este gasto no afectará el dinero en caja"
-                    : "✅ Transferencia: no afecta el dinero en caja"}
-                </p>
+
+                {/* Resumen del gasto */}
+                <div className="rounded-lg bg-primary/5 p-4 space-y-2">
+                  <p className="text-sm font-medium">Resumen del Gasto</p>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      Monto:
+                    </span>
+                    <span className="font-semibold">
+                      $
+                      {expenseForm.amount.toLocaleString("en-US", {
+                        maximumFractionDigits: 0,
+                      })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      Método:
+                    </span>
+                    <span className="font-medium">
+                      {expenseForm.paymentMethod === "cash"
+                        ? "Efectivo"
+                        : "Transferencia"}
+                    </span>
+                  </div>
+                  {expenseForm.paymentMethod === "cash" && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">
+                        Salir de caja:
+                      </span>
+                      <span
+                        className={`font-medium ${expenseForm.fromCashRegister ? "text-destructive" : "text-muted-foreground"}`}
+                      >
+                        {expenseForm.fromCashRegister ? "SÍ" : "NO"}
+                      </span>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {expenseForm.paymentMethod === "cash" &&
+                    expenseForm.fromCashRegister
+                      ? "⚠️ Este gasto se restará del dinero disponible en caja al final del día"
+                      : expenseForm.paymentMethod === "cash" &&
+                          !expenseForm.fromCashRegister
+                        ? "✅ Este gasto no afectará el dinero en caja"
+                        : "✅ Transferencia: no afecta el dinero en caja"}
+                  </p>
+                </div>
               </div>
-            </div>
-            <DialogFooter>
+            </ScrollArea>
+
+            <DialogFooter className="pt-4 border-t">
               <Button
                 variant="outline"
                 onClick={() => setShowExpenseDialog(false)}
@@ -665,7 +714,8 @@ export default function GastosPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar Eliminación</AlertDialogTitle>
               <AlertDialogDescription>
-                ¿Estás seguro de eliminar este gasto? Esta acción no se puede deshacer.
+                ¿Estás seguro de eliminar este gasto? Esta acción no se puede
+                deshacer.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
