@@ -503,7 +503,7 @@ export function POSInterface() {
         </head>
         <body>
           <div class="header">
-          <img src="/images/logo.jpeg" class="logo" alt="Logo" />
+          <img src="/images/logo.jpeg" class="logo" alt="Logo" onload="window.print()" />
             <div class="business-name">${config.businessName || "RESTAURANTE"}</div>
             <div class="owner-name">${"Elina Villegas"}</div>
             ${config.businessAddress ? `<div class="business-info">${config.businessAddress}</div>` : ""}
@@ -595,7 +595,6 @@ export function POSInterface() {
       </html>
     `);
       printWindow.document.close();
-      printWindow.print();
     }
   };
 
