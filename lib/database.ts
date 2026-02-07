@@ -470,17 +470,16 @@ export async function saveSale(
   sale: Omit<Sale, "id" | "createdAt" | "status">,
 ): Promise<Sale | null> {
   try {
+    // Check if daily closure exists
     if (await hasDailyClosure()) {
       return null;
     }
 
+    // Calcular cambio devuelto si aplica
     const cashReturned =
       sale.cashReceived > sale.cashAmount
         ? sale.cashReceived - sale.cashAmount
         : 0;
-    
-    const now = new Date();
-    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
 
     const newSale = {
       items: sale.items,
@@ -492,6 +491,7 @@ export async function saveSale(
       cash_returned: cashReturned,
       payment_method: sale.paymentMethod,
       status: "completed",
+      // created_at -> lo pone la BD
     };
 
     const { data, error } = await supabase
@@ -502,6 +502,7 @@ export async function saveSale(
 
     if (error) throw error;
 
+    // Update stock for products with inventory control
     for (const item of sale.items) {
       await updateProductStock(item.productId, item.quantity);
     }
