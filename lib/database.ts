@@ -478,6 +478,9 @@ export async function saveSale(
       sale.cashReceived > sale.cashAmount
         ? sale.cashReceived - sale.cashAmount
         : 0;
+    
+    const now = new Date();
+    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
 
     const newSale = {
       items: sale.items,
@@ -499,7 +502,6 @@ export async function saveSale(
 
     if (error) throw error;
 
-    // Update stock for products with inventory control
     for (const item of sale.items) {
       await updateProductStock(item.productId, item.quantity);
     }
