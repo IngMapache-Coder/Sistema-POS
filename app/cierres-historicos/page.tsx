@@ -210,6 +210,7 @@ export default function CierresHistoricosPage() {
     const monthName = new Date(
       `${selectedMonth}-01T00:00:00`,
     ).toLocaleDateString("es-MX", {
+      timeZone: "UTC",
       month: "long",
       year: "numeric",
     });
@@ -572,7 +573,7 @@ export default function CierresHistoricosPage() {
           ${config.businessNIT ? `<div class="business-nit">NIT: ${config.businessNIT}</div>` : ""}
           <div class="business-info">CIERRE DE CAJA</div>
           <div class="business-info">${closure.date}</div>
-          <div class="business-info">Hora: ${new Date(closure.createdAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</div>
+          <div class="business-info">Hora: ${new Date(closure.createdAt).toLocaleTimeString("es-MX", { timeZone: "UTC", hour: "2-digit", minute: "2-digit" })}</div>
         </div>
         
         <div class="section">
@@ -855,6 +856,7 @@ export default function CierresHistoricosPage() {
     const [year, month, day] = dateStr.split("-").map(Number);
     const date = new Date(year, month - 1, day);
     return date.toLocaleDateString("es-MX", {
+      timeZone: "UTC",
       weekday: "short",
       year: "numeric",
       month: "short",
@@ -920,6 +922,7 @@ export default function CierresHistoricosPage() {
                         parseInt(monthNum) - 1,
                         1,
                       ).toLocaleDateString("es-MX", {
+                        timeZone: "UTC",
                         month: "long",
                         year: "numeric",
                       });
@@ -975,6 +978,7 @@ export default function CierresHistoricosPage() {
                         parseInt(monthNum) - 1,
                         1,
                       ).toLocaleDateString("es-MX", {
+                        timeZone: "UTC",
                         month: "long",
                         year: "numeric",
                       });
@@ -1006,6 +1010,7 @@ export default function CierresHistoricosPage() {
               {filterMonth === "all"
                 ? "Todos los cierres registrados en el sistema"
                 : `Cierres de ${new Intl.DateTimeFormat("es-MX", {
+                    timeZone: "UTC",
                     month: "long",
                     year: "numeric",
                   }).format(new Date(`${filterMonth}-01T00:00:00`))}`}
@@ -1056,6 +1061,7 @@ export default function CierresHistoricosPage() {
                               {new Date(closure.createdAt).toLocaleTimeString(
                                 "es-MX",
                                 {
+                                  timeZone: "UTC",
                                   hour: "2-digit",
                                   minute: "2-digit",
                                 },
@@ -1375,6 +1381,7 @@ export default function CierresHistoricosPage() {
                                 <div className="text-xs text-muted-foreground mt-1">
                                   {new Date(sale.createdAt).toLocaleTimeString(
                                     "es-MX",
+                                    { timeZone: "UTC" }
                                   )}
                                 </div>
                                 <div className="text-xs mt-1">
@@ -1590,6 +1597,7 @@ export default function CierresHistoricosPage() {
                 {new Date(`${selectedMonth}-01T00:00:00`).toLocaleDateString(
                   "es-MX",
                   {
+                    timeZone: "UTC",
                     month: "long",
                     year: "numeric",
                   },

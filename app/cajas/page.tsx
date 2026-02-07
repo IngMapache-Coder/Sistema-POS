@@ -489,7 +489,11 @@ export default function CajasPage() {
                                   {account.movementType === "income" ? "INGRESO" : "EGRESO"}
                                 </Badge>
                                 <span className="text-xs text-muted-foreground">
-                                  {new Date(account.createdAt).toLocaleString("es-MX")}
+                                  {new Date(account.createdAt).toLocaleString("es-MX", {
+                                    timeZone: "UTC",
+                                    dateStyle: "short",
+                                    timeStyle: "short",
+                                  })}
                                 </span>
                               </div>
                               {account.notes && (

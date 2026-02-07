@@ -321,7 +321,7 @@ export default function CierrePage() {
       printWindow.document.write(`
         <html>
           <head>
-            <title>Cierre de Caja - ${new Date().toLocaleDateString("es-MX")}</title>
+            <title>Cierre de Caja - ${new Date().toLocaleDateString("es-MX", { timeZone: "UTC" })}</title>
             <style>
               body { font-family: monospace; font-size: 11px; width: 280px; margin: 0 auto; padding: 10px; }
               .header { text-align: center; margin-bottom: 15px; }
@@ -400,7 +400,7 @@ export default function CierrePage() {
             ${config.businessPhone ? `<div class="business-info">Tel: ${config.businessPhone}</div>` : ""}
             ${config.businessNIT ? `<div class="business-nit">NIT: ${config.businessNIT}</div>` : ""}
             <div class="business-info">CIERRE DE CAJA</div>
-            <div class="business-info">${new Date().toLocaleDateString("es-MX")}</div>
+            <div class="business-info">${new Date().toLocaleDateString("es-MX", { timeZone: "UTC" })}</div>
             </div>
             
             <div class="section">
@@ -552,6 +552,7 @@ export default function CierrePage() {
             <h1 className="text-2xl font-bold">Cierre de Caja</h1>
             <p className="text-muted-foreground">
               {new Date().toLocaleDateString("es-MX", {
+                timeZone: "UTC",
                 weekday: "long",
                 year: "numeric",
                 month: "long",

@@ -470,12 +470,10 @@ export async function saveSale(
   sale: Omit<Sale, "id" | "createdAt" | "status">,
 ): Promise<Sale | null> {
   try {
-    // Check if daily closure exists
     if (await hasDailyClosure()) {
       return null;
     }
 
-    // Calcular cambio devuelto si aplica
     const cashReturned =
       sale.cashReceived > sale.cashAmount
         ? sale.cashReceived - sale.cashAmount
@@ -491,7 +489,6 @@ export async function saveSale(
       cash_returned: cashReturned,
       payment_method: sale.paymentMethod,
       status: "completed",
-      created_at: new Date().toISOString(),
     };
 
     const { data, error } = await supabase
@@ -507,7 +504,7 @@ export async function saveSale(
       await updateProductStock(item.productId, item.quantity);
     }
 
-    // REGISTRAR TRANSFERENCIA EN CAJA MAYOR si existe
+    // Registrar transferencia en caja mayor si existe
     if (sale.transferAmount > 0) {
       await registerTransferIncome(
         sale.transferAmount,
@@ -527,7 +524,7 @@ export async function saveSale(
       cashReturned: parseFloat(data.cash_returned),
       paymentMethod: data.payment_method,
       status: data.status,
-      createdAt: data.created_at,
+      createdAt: data.created_at, // ya viene correcto (-05:00)
     };
   } catch (error) {
     handleSupabaseError(error, "Error al guardar venta");
@@ -669,7 +666,6 @@ export async function saveExpense(
       category: expense.category,
       payment_method: expense.paymentMethod,
       from_cash_register: expense.fromCashRegister || false,
-      created_at: new Date().toISOString(),
     };
 
     const { data, error } = await supabase
@@ -798,7 +794,6 @@ export async function saveEmployeePayment(
       notes: payment.notes,
       payment_method: payment.paymentMethod,
       from_cash_register: payment.fromCashRegister,
-      created_at: new Date().toISOString(),
     };
 
     const { data, error } = await supabase
@@ -996,8 +991,7 @@ export async function createDailyClosure(): Promise<DailyClosure> {
       total_payments: totalPayments,
       low_stock_products: lowStockProducts,
       daily_base: config.dailyBase,
-      cash_excess_transferred: excessCash, // GUARDAR EL MONTO TRANSFERIDO
-      created_at: new Date().toISOString(),
+      cash_excess_transferred: excessCash,
     };
 
     const { data, error } = await supabase
@@ -1702,7 +1696,6 @@ export async function addMajorCashMovement(
       movement_type: movement.movementType,
       notes: movement.notes,
       created_by: movement.createdBy,
-      created_at: new Date().toISOString(),
     };
 
     const { data, error } = await supabase

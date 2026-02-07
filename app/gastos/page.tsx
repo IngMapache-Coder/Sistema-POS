@@ -482,6 +482,7 @@ export default function GastosPage() {
                               {new Date(expense.createdAt).toLocaleString(
                                 "es-MX",
                                 {
+                                  timeZone: "UTC",
                                   dateStyle: "short",
                                   timeStyle: "short",
                                 },

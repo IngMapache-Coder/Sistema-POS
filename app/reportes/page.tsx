@@ -60,6 +60,7 @@ export default function ReportesPage() {
     const [year, month, day] = dateStr.split("-").map(Number);
     const date = new Date(year, month - 1, day);
     return date.toLocaleDateString("es-MX", {
+      timeZone: "UTC",
       day: "2-digit",
       month: "short",
     });
@@ -70,6 +71,7 @@ export default function ReportesPage() {
     const [year, month, day] = dateStr.split("-").map(Number);
     const date = new Date(year, month - 1, day);
     return date.toLocaleDateString("es-MX", {
+      timeZone: "UTC",
       weekday: "long",
       year: "numeric",
       month: "long",
@@ -132,6 +134,7 @@ export default function ReportesPage() {
 
     return {
       month: new Date(year, month - 1, 15).toLocaleDateString("es-MX", {
+        timeZone: "UTC",
         month: "short",
         year: "numeric",
       }),
@@ -440,6 +443,7 @@ export default function ReportesPage() {
                   {availableMonths.map((month) => (
                     <SelectItem key={month} value={month}>
                       {new Date(month + "-01").toLocaleDateString("es-MX", {
+                        timeZone: "UTC",
                         month: "long",
                         year: "numeric",
                       })}

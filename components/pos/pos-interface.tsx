@@ -513,7 +513,9 @@ export function POSInterface() {
               Ticket #${sale.id.slice(-6).toUpperCase()}
             </div>
             <div class="business-info">
-              ${new Date(sale.createdAt).toLocaleString("es-MX")}
+              ${new Date(sale.createdAt).toLocaleString("es-MX",{
+                timeZone: "UTC"
+              })}
             </div>
           </div>
           
@@ -1122,7 +1124,11 @@ export function POSInterface() {
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
-                          {new Date(sale.createdAt).toLocaleTimeString("es-MX")}
+                          {new Date(sale.createdAt).toLocaleTimeString("es-MX",{
+                            timeZone: "UTC",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
                         </p>
                         <div className="mt-2 text-sm">
                           {sale.items.map((item) => (
