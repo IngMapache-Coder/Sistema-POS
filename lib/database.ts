@@ -1652,46 +1652,28 @@ export async function getMajorCashAccounts(): Promise<MajorCashAccount[]> {
 
 export async function getMajorCashSummary(): Promise<MajorCashSummary> {
   try {
-    const { data: transfersData, error: transfersError } = await supabase
-      .from("major_cash_accounts")
-      .select("movement_type, amount")
-      .eq("type", "transfer");
+    const { data, error } = await supabase
+      .rpc('get_major_cash_summary');
 
-    if (transfersError) throw transfersError;
+    if (error) throw error;
 
-    const { data: savedCashData, error: savedCashError } = await supabase
-      .from("major_cash_accounts")
-      .select("movement_type, amount")
-      .eq("type", "saved_cash");
-
-    if (savedCashError) throw savedCashError;
-
-    const totalTransfers = (transfersData || []).reduce((sum, a) => {
-      const amount = parseFloat(a.amount);
-      return a.movement_type === "income" ? sum + amount : sum - amount;
-    }, 0);
-
-    const totalSavedCash = (savedCashData || []).reduce((sum, a) => {
-      const amount = parseFloat(a.amount);
-      return a.movement_type === "income" ? sum + amount : sum - amount;
-    }, 0);
-
-    const { data: lastMovement, error: lastError } = await supabase
-      .from("major_cash_accounts")
-      .select("created_at")
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (lastError) throw lastError;
+    if (data && data.length > 0) {
+      return {
+        totalTransfers: parseFloat(data[0].total_transfers),
+        totalSavedCash: parseFloat(data[0].total_saved_cash),
+        totalMajorCash: parseFloat(data[0].total_major_cash),
+        lastUpdate: data[0].last_update || new Date().toISOString(),
+      };
+    }
 
     return {
-      totalTransfers,
-      totalSavedCash,
-      totalMajorCash: totalTransfers + totalSavedCash,
-      lastUpdate: lastMovement?.[0]?.created_at || new Date().toISOString(),
+      totalTransfers: 0,
+      totalSavedCash: 0,
+      totalMajorCash: 0,
+      lastUpdate: new Date().toISOString(),
     };
   } catch (error) {
-    console.error("Error al calcular resumen de caja mayor:", error);
+    console.error('Error al calcular resumen:', error);
     return {
       totalTransfers: 0,
       totalSavedCash: 0,
