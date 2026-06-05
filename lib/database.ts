@@ -1652,30 +1652,43 @@ export async function getMajorCashAccounts(): Promise<MajorCashAccount[]> {
 
 export async function getMajorCashSummary(): Promise<MajorCashSummary> {
   try {
-    const accounts = await getMajorCashAccounts();
+    const { data: transfersData, error: transfersError } = await supabase
+      .from("major_cash_accounts")
+      .select("movement_type, amount")
+      .eq("type", "transfer");
 
-    const totalTransfers = accounts
-      .filter((a) => a.type === "transfer")
-      .reduce(
-        (sum, a) =>
-          a.movementType === "income" ? sum + a.amount : sum - a.amount,
-        0,
-      );
+    if (transfersError) throw transfersError;
 
-    const totalSavedCash = accounts
-      .filter((a) => a.type === "saved_cash")
-      .reduce(
-        (sum, a) =>
-          a.movementType === "income" ? sum + a.amount : sum - a.amount,
-        0,
-      );
+    const { data: savedCashData, error: savedCashError } = await supabase
+      .from("major_cash_accounts")
+      .select("movement_type, amount")
+      .eq("type", "saved_cash");
+
+    if (savedCashError) throw savedCashError;
+
+    const totalTransfers = (transfersData || []).reduce((sum, a) => {
+      const amount = parseFloat(a.amount);
+      return a.movement_type === "income" ? sum + amount : sum - amount;
+    }, 0);
+
+    const totalSavedCash = (savedCashData || []).reduce((sum, a) => {
+      const amount = parseFloat(a.amount);
+      return a.movement_type === "income" ? sum + amount : sum - amount;
+    }, 0);
+
+    const { data: lastMovement, error: lastError } = await supabase
+      .from("major_cash_accounts")
+      .select("created_at")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (lastError) throw lastError;
 
     return {
       totalTransfers,
       totalSavedCash,
       totalMajorCash: totalTransfers + totalSavedCash,
-      lastUpdate:
-        accounts.length > 0 ? accounts[0].createdAt : new Date().toISOString(),
+      lastUpdate: lastMovement?.[0]?.created_at || new Date().toISOString(),
     };
   } catch (error) {
     console.error("Error al calcular resumen de caja mayor:", error);
