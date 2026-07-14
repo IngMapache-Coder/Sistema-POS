@@ -53,6 +53,15 @@ export interface Sale {
   cancelledBy?: string;
 }
 
+export interface Customer {
+  id: string;
+  name: string;
+  documentType: "cc" | "nit";
+  documentNumber: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Expense {
   id: string;
   description: string;

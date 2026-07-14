@@ -1,7 +1,7 @@
 "use client";
 
 import { InputNumber } from "@/components/ui/input-number";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,6 +56,7 @@ import {
   Wrench,
   Server,
   Truck,
+  Loader2,
 } from "lucide-react";
 
 const EXPENSE_CATEGORIES = [
@@ -111,6 +112,8 @@ export default function GastosPage() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"today" | "all">("today");
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const lastSubmitRef = useRef<number>(0);
 
   // Form state
   const [expenseForm, setExpenseForm] = useState({
@@ -163,6 +166,13 @@ export default function GastosPage() {
   };
 
   const handleSaveExpense = async () => {
+    // Capa 2 — Throttle
+    const now = Date.now();
+    if (now - lastSubmitRef.current < 2000) return;
+    lastSubmitRef.current = now;
+    // Capa 1 — Estado
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       const isClosed = await hasDailyClosure();
       if (isClosed) {
@@ -238,6 +248,8 @@ export default function GastosPage() {
         description: "No se pudo registrar el gasto",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -704,7 +716,16 @@ export default function GastosPage() {
               >
                 Cancelar
               </Button>
-              <Button onClick={handleSaveExpense}>Registrar Gasto</Button>
+              <Button
+                onClick={handleSaveExpense}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Guardando...</>
+                ) : (
+                  "Registrar Gasto"
+                )}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

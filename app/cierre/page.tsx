@@ -1,7 +1,7 @@
 "use client";
 
 import { ReopenCashRegisterForm } from "@/components/ui/reopen-cash-register-form";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,6 +63,7 @@ import {
   Package,
   Wallet,
   DollarSign,
+  Loader2,
 } from "lucide-react";
 
 export default function CierrePage() {
@@ -77,6 +78,9 @@ export default function CierrePage() {
   const [todayClosure, setTodayClosure] = useState<DailyClosure | null>(null);
   const [config, setConfig] = useState<any>({ dailyBase: 0 });
   const { toast } = useToast();
+
+  const [isClosing, setIsClosing] = useState(false);
+  const lastCloseSubmitRef = useRef<number>(0);
 
   useEffect(() => {
     loadData();
@@ -189,6 +193,13 @@ export default function CierrePage() {
   );
 
   const handleCloseCash = async () => {
+    // Capa 2 — Throttle
+    const now = Date.now();
+    if (now - lastCloseSubmitRef.current < 2000) return;
+    lastCloseSubmitRef.current = now;
+    // Capa 1 — Estado
+    if (isClosing) return;
+    setIsClosing(true);
     try {
       const closure = await createDailyClosure();
       setTodayClosure(closure);
@@ -209,6 +220,8 @@ export default function CierrePage() {
         description: "No se pudo completar el cierre de caja",
         variant: "destructive",
       });
+    } finally {
+      setIsClosing(false);
     }
   };
 
@@ -1344,8 +1357,12 @@ export default function CierrePage() {
             </div>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleCloseCash}>
-                Confirmar Cierre
+              <AlertDialogAction onClick={handleCloseCash} disabled={isClosing}>
+                {isClosing ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Procesando...</>
+                ) : (
+                  "Confirmar Cierre"
+                )}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

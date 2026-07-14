@@ -1,7 +1,7 @@
 "use client";
 
 import { InputNumber } from "@/components/ui/input-number";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,6 +60,7 @@ import {
   ShieldAlert,
   Banknote,
   CreditCard,
+  Loader2,
 } from "lucide-react";
 
 const POSITIONS = [
@@ -87,6 +88,11 @@ export default function EmpleadosPage() {
     useState<string>("");
   const [currentUser, setCurrentUser] = useState<any>(null);
   const { toast } = useToast();
+
+  const [isSavingEmployee, setIsSavingEmployee] = useState(false);
+  const lastEmployeeSubmitRef = useRef<number>(0);
+  const [isSavingPayment, setIsSavingPayment] = useState(false);
+  const lastPaymentSubmitRef = useRef<number>(0);
 
   // Form states
   const [employeeForm, setEmployeeForm] = useState({
@@ -178,6 +184,13 @@ export default function EmpleadosPage() {
   };
 
   const handleSaveEmployee = async () => {
+    // Capa 2 — Throttle
+    const now = Date.now();
+    if (now - lastEmployeeSubmitRef.current < 2000) return;
+    lastEmployeeSubmitRef.current = now;
+    // Capa 1 — Estado
+    if (isSavingEmployee) return;
+    setIsSavingEmployee(true);
     if (!canManageEmployees()) {
       toast({
         title: "Permiso denegado",
@@ -223,6 +236,8 @@ export default function EmpleadosPage() {
         description: "No se pudo guardar el empleado",
         variant: "destructive",
       });
+    } finally {
+      setIsSavingEmployee(false);
     }
   };
 
@@ -263,6 +278,13 @@ export default function EmpleadosPage() {
   };
 
   const handleSavePayment = async () => {
+    // Capa 2 — Throttle
+    const now = Date.now();
+    if (now - lastPaymentSubmitRef.current < 2000) return;
+    lastPaymentSubmitRef.current = now;
+    // Capa 1 — Estado
+    if (isSavingPayment) return;
+    setIsSavingPayment(true);
     if (!payingEmployee || !canRegisterPayments()) return;
 
     try {
@@ -319,6 +341,8 @@ export default function EmpleadosPage() {
         description: "No se pudo registrar el pago",
         variant: "destructive",
       });
+    } finally {
+      setIsSavingPayment(false);
     }
   };
 
@@ -776,8 +800,12 @@ export default function EmpleadosPage() {
               >
                 Cancelar
               </Button>
-              <Button onClick={handleSaveEmployee}>
-                {editingEmployee ? "Guardar" : "Registrar"}
+              <Button onClick={handleSaveEmployee} disabled={isSavingEmployee}>
+                {isSavingEmployee ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Guardando...</>
+                ) : (
+                  editingEmployee ? "Guardar" : "Registrar"
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1016,8 +1044,13 @@ export default function EmpleadosPage() {
               <Button
                 onClick={handleSavePayment}
                 className="bg-success text-success-foreground hover:bg-success/90"
+                disabled={isSavingPayment}
               >
-                Registrar Pago
+                {isSavingPayment ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Registrando...</>
+                ) : (
+                  "Registrar Pago"
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

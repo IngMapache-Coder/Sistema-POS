@@ -1,7 +1,7 @@
 "use client";
 
 import { InputNumber } from "@/components/ui/input-number";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,8 +26,10 @@ import {
   cancelSale,
   hasDailyClosure,
   getConfig,
+  getCustomerByDocument,
+  saveCustomer,
 } from "@/lib/database";
-import type { Category, Product, CartItem, Sale } from "@/lib/types";
+import type { Category, Product, CartItem, Sale, Customer } from "@/lib/types";
 import {
   Minus,
   Plus,
@@ -38,6 +40,10 @@ import {
   X,
   Printer,
   Ban,
+  Search,
+  UserCheck,
+  UserPlus,
+  Loader2,
 } from "lucide-react";
 import { Value } from "@radix-ui/react-select";
 
@@ -68,6 +74,29 @@ export function POSInterface() {
   });
   const [productsTimestamp, setProductsTimestamp] = useState(Date.now());
   const { toast } = useToast();
+
+  const [isCompletingSale, setIsCompletingSale] = useState(false);
+  const lastSaleSubmitRef = useRef<number>(0);
+
+  // --- Estados para el modal de facturación al imprimir ---
+  const [showPrintCustomerDialog, setShowPrintCustomerDialog] = useState(false);
+  const [saleToPrint, setSaleToPrint] = useState<Sale | null>(null);
+  const [printCustomerEnabled, setPrintCustomerEnabled] = useState(false);
+  const [printDocType, setPrintDocType] = useState<"cc" | "nit">("cc");
+  const [printDocNumber, setPrintDocNumber] = useState("");
+  const [printCustomerName, setPrintCustomerName] = useState("");
+  const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
+  const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
+
+  const resetPrintCustomerState = () => {
+    setPrintCustomerEnabled(false);
+    setPrintDocType("cc");
+    setPrintDocNumber("");
+    setPrintCustomerName("");
+    setFoundCustomer(null);
+    setIsSearchingCustomer(false);
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -242,6 +271,15 @@ export function POSInterface() {
   };
 
   const handleCompleteSale = async () => {
+    // Capa 2 — Throttle: descarta si el último envío fue hace menos de 2 segundos
+    const now = Date.now();
+    if (now - lastSaleSubmitRef.current < 2000) return;
+    lastSaleSubmitRef.current = now;
+
+    // Capa 1 — Estado: deshabilita el botón y evita re-entrada
+    if (isCompletingSale) return;
+    setIsCompletingSale(true);
+
     try {
       const isClosed = await hasDailyClosure();
       if (isClosed) {
@@ -361,6 +399,8 @@ export function POSInterface() {
         description: "No se pudo completar la venta",
         variant: "destructive",
       });
+    } finally {
+      setIsCompletingSale(false);
     }
   };
 
@@ -410,7 +450,57 @@ export function POSInterface() {
     }
   };
 
-  const printTicket = (sale: Sale) => {
+  // Abrir el modal de selección de cliente antes de imprimir
+  const openPrintDialog = (sale: Sale) => {
+    setSaleToPrint(sale);
+    resetPrintCustomerState();
+    setShowPrintCustomerDialog(true);
+  };
+
+  const handleSearchCustomer = async () => {
+    if (!printDocNumber.trim()) return;
+    setIsSearchingCustomer(true);
+    setFoundCustomer(null);
+    setPrintCustomerName("");
+    try {
+      const customer = await getCustomerByDocument(printDocType, printDocNumber.trim());
+      if (customer) {
+        setFoundCustomer(customer);
+        setPrintCustomerName(customer.name);
+      }
+    } catch {
+      // silencioso
+    } finally {
+      setIsSearchingCustomer(false);
+    }
+  };
+
+  const handleConfirmPrintWithCustomer = async () => {
+    if (!saleToPrint) return;
+    if (!printDocNumber.trim() || !printCustomerName.trim()) {
+      toast({ title: "Datos incompletos", description: "Ingresa el número de documento y el nombre del cliente", variant: "destructive" });
+      return;
+    }
+    setIsSavingCustomer(true);
+    try {
+      // Guardar cliente si es nuevo
+      if (!foundCustomer) {
+        await saveCustomer({ name: printCustomerName.trim(), documentType: printDocType, documentNumber: printDocNumber.trim() });
+      }
+      const customerDetails = { name: printCustomerName.trim(), documentType: printDocType, documentNumber: printDocNumber.trim() };
+      const saleSnapshot = saleToPrint; // captura antes de limpiar
+      setShowPrintCustomerDialog(false);
+      resetPrintCustomerState();
+      setSaleToPrint(null);
+      if (saleSnapshot) printTicket(saleSnapshot, customerDetails);
+    } catch {
+      toast({ title: "Error", description: "No se pudo guardar el cliente", variant: "destructive" });
+    } finally {
+      setIsSavingCustomer(false);
+    }
+  };
+
+  const printTicket = (sale: Sale, customer?: { name: string; documentType: "cc" | "nit"; documentNumber: string }) => {
     const printWindow = window.open("", "_blank", "width=300,height=600");
     if (printWindow) {
       printWindow.document.write(`
@@ -518,6 +608,14 @@ export function POSInterface() {
               })}
             </div>
           </div>
+          ${customer ? `
+          <div class="line"></div>
+          <div style="margin-bottom:8px;">
+            <div style="font-size:11px;text-align:center;color:#555;margin-bottom:2px;">FACTURA A NOMBRE DE:</div>
+            <div style="font-size:13px;font-weight:bold;text-align:center;">${customer.name}</div>
+            <div style="font-size:11px;text-align:center;color:#555;">${customer.documentType.toUpperCase()}: ${customer.documentNumber}</div>
+          </div>
+          ` : ""}
           
           <div class="line"></div>
           
@@ -1082,8 +1180,13 @@ export function POSInterface() {
             <Button
               className="bg-success text-success-foreground hover:bg-success/90 px-6"
               onClick={handleCompleteSale}
+              disabled={isCompletingSale}
             >
-              Completar Venta
+              {isCompletingSale ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Procesando...</>
+              ) : (
+                "Completar Venta"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1187,7 +1290,7 @@ export function POSInterface() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => printTicket(sale)}
+                              onClick={() => openPrintDialog(sale)}
                             >
                               <Printer className="h-4 w-4" />
                             </Button>
@@ -1223,6 +1326,163 @@ export function POSInterface() {
               </span>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Print Customer Dialog */}
+      <Dialog
+        open={showPrintCustomerDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowPrintCustomerDialog(false);
+            resetPrintCustomerState();
+            setSaleToPrint(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Imprimir Factura</DialogTitle>
+          </DialogHeader>
+
+          {!printCustomerEnabled ? (
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-muted-foreground text-center">
+                ¿Deseas imprimir la factura a nombre de un cliente?
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowPrintCustomerDialog(false);
+                    if (saleToPrint) printTicket(saleToPrint);
+                    setSaleToPrint(null);
+                  }}
+                >
+                  Sin cliente
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={() => setPrintCustomerEnabled(true)}
+                >
+                  Con cliente
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              {/* Tipo de documento */}
+              <div className="space-y-2">
+                <Label>Tipo de Documento</Label>
+                <div className="flex gap-2">
+                  <Button
+                    variant={printDocType === "cc" ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      setPrintDocType("cc");
+                      setPrintDocNumber("");
+                      setPrintCustomerName("");
+                      setFoundCustomer(null);
+                    }}
+                  >
+                    CC - Persona Natural
+                  </Button>
+                  <Button
+                    variant={printDocType === "nit" ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      setPrintDocType("nit");
+                      setPrintDocNumber("");
+                      setPrintCustomerName("");
+                      setFoundCustomer(null);
+                    }}
+                  >
+                    NIT - Empresa
+                  </Button>
+                </div>
+              </div>
+
+              {/* Número de documento */}
+              <div className="space-y-2">
+                <Label htmlFor="printDocNumber">
+                  {printDocType === "cc" ? "Número de Cédula" : "Número de NIT"}
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="printDocNumber"
+                    value={printDocNumber}
+                    onChange={(e) => {
+                      setPrintDocNumber(e.target.value);
+                      setFoundCustomer(null);
+                      setPrintCustomerName("");
+                    }}
+                    placeholder={printDocType === "cc" ? "Ej: 1234567890" : "Ej: 900123456-1"}
+                    className="flex-1"
+                    onKeyDown={(e) => e.key === "Enter" && handleSearchCustomer()}
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleSearchCustomer}
+                    disabled={isSearchingCustomer || !printDocNumber.trim()}
+                    title="Buscar cliente"
+                  >
+                    <Search className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Indicador de cliente encontrado / nuevo */}
+              {foundCustomer && (
+                <div className="flex items-center gap-2 rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-2">
+                  <UserCheck className="h-4 w-4 text-green-600 shrink-0" />
+                  <span className="text-sm text-green-700 font-medium">Cliente registrado</span>
+                </div>
+              )}
+              {!foundCustomer && printDocNumber.trim() && !isSearchingCustomer && (
+                <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+                  <UserPlus className="h-4 w-4 text-amber-600 shrink-0" />
+                  <span className="text-sm text-amber-700">Cliente nuevo — se registrará automáticamente</span>
+                </div>
+              )}
+
+              {/* Nombre */}
+              <div className="space-y-2">
+                <Label htmlFor="printCustomerName">
+                  {printDocType === "cc" ? "Nombre Completo" : "Razón Social / Nombre Empresa"}
+                </Label>
+                <Input
+                  id="printCustomerName"
+                  value={printCustomerName}
+                  onChange={(e) => setPrintCustomerName(e.target.value)}
+                  placeholder={printDocType === "cc" ? "Ej: Juan Pérez" : "Ej: Empresa S.A.S"}
+                  readOnly={!!foundCustomer}
+                  className={foundCustomer ? "bg-muted text-muted-foreground" : ""}
+                />
+              </div>
+
+              {/* Botones confirmar */}
+              <div className="flex gap-3 pt-1">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setPrintCustomerEnabled(false)}
+                >
+                  Atrás
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={handleConfirmPrintWithCustomer}
+                  disabled={isSavingCustomer || !printDocNumber.trim() || !printCustomerName.trim()}
+                >
+                  {isSavingCustomer ? "Guardando..." : "Confirmar e Imprimir"}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

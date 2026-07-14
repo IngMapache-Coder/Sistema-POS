@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,6 +54,7 @@ import {
   Package,
   FolderOpen,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
 
 const CATEGORY_COLORS = [
@@ -91,6 +92,8 @@ export default function MenuPage() {
     id: string;
   } | null>(null);
   const { toast } = useToast();
+  const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
+  const lastProductSubmitRef = useRef<number>(0);
 
   // Form states
   const [categoryForm, setCategoryForm] = useState({
@@ -237,6 +240,13 @@ export default function MenuPage() {
   };
 
   const handleSaveProduct = async () => {
+    // Capa 2 — Throttle
+    const now = Date.now();
+    if (now - lastProductSubmitRef.current < 2000) return;
+    lastProductSubmitRef.current = now;
+    // Capa 1 — Estado
+    if (isSubmittingProduct) return;
+    setIsSubmittingProduct(true);
     if (!productForm.name.trim()) {
       toast({
         title: "Error",
@@ -282,6 +292,8 @@ export default function MenuPage() {
         description: "No se pudo guardar el producto",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmittingProduct(false);
     }
   };
 
@@ -717,8 +729,12 @@ export default function MenuPage() {
               >
                 Cancelar
               </Button>
-              <Button onClick={handleSaveProduct}>
-                {editingProduct ? "Guardar" : "Crear"}
+              <Button onClick={handleSaveProduct} disabled={isSubmittingProduct}>
+                {isSubmittingProduct ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Guardando...</>
+                ) : (
+                  editingProduct ? "Guardar" : "Crear"
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

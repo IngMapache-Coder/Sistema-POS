@@ -16,6 +16,7 @@ import type {
   SaleItem,
   MajorCashAccount,
   MajorCashSummary,
+  Customer,
 } from "./types";
 
 // Helper functions
@@ -532,6 +533,71 @@ export async function saveSale(
   } catch (error) {
     handleSupabaseError(error, "Error al guardar venta");
     return null;
+  }
+}
+
+// Customers (directorio independiente de clientes)
+export async function getCustomerByDocument(
+  documentType: "cc" | "nit",
+  documentNumber: string,
+): Promise<Customer | null> {
+  try {
+    const { data, error } = await supabase
+      .from("customers")
+      .select("*")
+      .eq("document_type", documentType)
+      .eq("document_number", documentNumber)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return null;
+
+    return {
+      id: data.id,
+      name: data.name,
+      documentType: data.document_type,
+      documentNumber: data.document_number,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+  } catch (error) {
+    handleSupabaseError(error, "Error al buscar cliente");
+    return null;
+  }
+}
+
+export async function saveCustomer(
+  customer: Omit<Customer, "id" | "createdAt" | "updatedAt">,
+): Promise<Customer> {
+  try {
+    // Primero intentar insertar. Si ya existe por UNIQUE, actualizamos el nombre.
+    const { data, error } = await supabase
+      .from("customers")
+      .upsert(
+        {
+          name: customer.name,
+          document_type: customer.documentType,
+          document_number: customer.documentNumber,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "document_type,document_number" },
+      )
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      id: data.id,
+      name: data.name,
+      documentType: data.document_type,
+      documentNumber: data.document_number,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+  } catch (error) {
+    handleSupabaseError(error, "Error al guardar cliente");
+    throw error;
   }
 }
 
