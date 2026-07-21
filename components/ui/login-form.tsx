@@ -55,9 +55,9 @@ export function LoginForm() {
           description: `Hola ${user.name}, has iniciado sesión correctamente`,
         });
         
-        // Redirigir a la página principal
+        // Redirigir según el rol
         setTimeout(() => {
-          window.location.href = "/";
+          window.location.href = user.role === "waiter" ? "/mesas" : "/";
         }, 500);
       } else {
         toast({

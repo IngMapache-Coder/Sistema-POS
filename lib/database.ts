@@ -17,6 +17,9 @@ import type {
   MajorCashAccount,
   MajorCashSummary,
   Customer,
+  Table,
+  TableTicket,
+  TableTicketItem,
 } from "./types";
 
 // Helper functions
@@ -2053,5 +2056,251 @@ export async function getMonthlyClosures(yearMonth: string): Promise<DailyClosur
   } catch (error) {
     console.error("Error al obtener cierres mensuales:", error);
     return [];
+  }
+}
+
+// ============================================================
+// MESAS (Tables Management)
+// ============================================================
+
+export async function getTables(): Promise<Table[]> {
+  try {
+    const { data, error } = await supabase
+      .from("tables")
+      .select("*")
+      .order("name", { ascending: true });
+    if (error) throw error;
+    return (data || []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      status: t.status,
+      activeTicketId: t.active_ticket_id,
+      createdAt: t.created_at,
+    }));
+  } catch (error) {
+    handleSupabaseError(error, "Error al cargar mesas");
+    return [];
+  }
+}
+
+export async function saveTable(name: string): Promise<Table> {
+  try {
+    const { data, error } = await supabase
+      .from("tables")
+      .insert({ name })
+      .select()
+      .single();
+    if (error) throw error;
+    return { id: data.id, name: data.name, status: data.status, activeTicketId: data.active_ticket_id, createdAt: data.created_at };
+  } catch (error) {
+    handleSupabaseError(error, "Error al crear mesa");
+    throw error;
+  }
+}
+
+export async function updateTable(id: string, name: string): Promise<void> {
+  try {
+    const { error } = await supabase.from("tables").update({ name }).eq("id", id);
+    if (error) throw error;
+  } catch (error) {
+    handleSupabaseError(error, "Error al actualizar mesa");
+    throw error;
+  }
+}
+
+export async function deleteTable(id: string): Promise<void> {
+  try {
+    const { error } = await supabase.from("tables").delete().eq("id", id);
+    if (error) throw error;
+  } catch (error) {
+    handleSupabaseError(error, "Error al eliminar mesa");
+    throw error;
+  }
+}
+
+/** Crea un nuevo ticket y asigna las mesas indicadas, marcándolas como ocupadas. */
+export async function createTableTicket(tableIds: string[]): Promise<TableTicket> {
+  try {
+    const { data: ticket, error: ticketError } = await supabase
+      .from("table_tickets")
+      .insert({})
+      .select()
+      .single();
+    if (ticketError) throw ticketError;
+
+    const { error: updateError } = await supabase
+      .from("tables")
+      .update({ status: "busy", active_ticket_id: ticket.id })
+      .in("id", tableIds);
+    if (updateError) throw updateError;
+
+    return { id: ticket.id, createdAt: ticket.created_at };
+  } catch (error) {
+    handleSupabaseError(error, "Error al abrir comanda");
+    throw error;
+  }
+}
+
+/** Asocia mesas adicionales a un ticket existente (unir mesas). */
+export async function groupTablesUnderTicket(tableIds: string[], ticketId: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from("tables")
+      .update({ status: "busy", active_ticket_id: ticketId })
+      .in("id", tableIds);
+    if (error) throw error;
+  } catch (error) {
+    handleSupabaseError(error, "Error al unir mesas");
+    throw error;
+  }
+}
+
+/** Deshace la unión de las mesas asociadas a un ticket, liberando todas excepto la principal. */
+export async function ungroupTables(ticketId: string, keepTableId: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from("tables")
+      .update({ status: "available", active_ticket_id: null })
+      .eq("active_ticket_id", ticketId)
+      .neq("id", keepTableId);
+    if (error) throw error;
+  } catch (error) {
+    handleSupabaseError(error, "Error al deshacer unión de mesas");
+    throw error;
+  }
+}
+
+export async function getTableTicketItems(ticketId: string): Promise<TableTicketItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from("table_ticket_items")
+      .select(`
+        id,
+        ticket_id,
+        quantity,
+        notes,
+        created_at,
+        products!inner(id, name, price)
+      `)
+      .eq("ticket_id", ticketId)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    return (data || []).map((item: any) => ({
+      id: item.id,
+      ticketId: item.ticket_id,
+      productId: item.products.id,
+      productName: item.products.name,
+      productPrice: parseFloat(item.products.price),
+      quantity: item.quantity,
+      notes: item.notes,
+      createdAt: item.created_at,
+    }));
+  } catch (error) {
+    handleSupabaseError(error, "Error al cargar ítems de comanda");
+    return [];
+  }
+}
+
+export async function addItemToTableTicket(
+  ticketId: string,
+  productId: string,
+  quantity: number = 1,
+  notes: string | null = null,
+): Promise<TableTicketItem> {
+  try {
+    const { data, error } = await supabase
+      .from("table_ticket_items")
+      .insert({ ticket_id: ticketId, product_id: productId, quantity, notes })
+      .select(`id, ticket_id, quantity, notes, created_at, products!inner(id, name, price)`)
+      .single();
+    if (error) throw error;
+    return {
+      id: data.id,
+      ticketId: data.ticket_id,
+      productId: (data as any).products.id,
+      productName: (data as any).products.name,
+      productPrice: parseFloat((data as any).products.price),
+      quantity: data.quantity,
+      notes: data.notes,
+      createdAt: data.created_at,
+    };
+  } catch (error) {
+    handleSupabaseError(error, "Error al agregar ítem a comanda");
+    throw error;
+  }
+}
+
+export async function updateTableTicketItem(
+  itemId: string,
+  quantity: number,
+  notes: string | null,
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from("table_ticket_items")
+      .update({ quantity, notes })
+      .eq("id", itemId);
+    if (error) throw error;
+  } catch (error) {
+    handleSupabaseError(error, "Error al actualizar ítem de comanda");
+    throw error;
+  }
+}
+
+export async function deleteTableTicketItem(itemId: string): Promise<void> {
+  try {
+    const { error } = await supabase.from("table_ticket_items").delete().eq("id", itemId);
+    if (error) throw error;
+  } catch (error) {
+    handleSupabaseError(error, "Error al eliminar ítem de comanda");
+    throw error;
+  }
+}
+
+/**
+ * Deduce las cantidades cobradas del ticket de mesa.
+ * Si un ítem queda en 0 se elimina. Si el ticket queda vacío,
+ * se elimina el ticket y las mesas vuelven a 'available'.
+ */
+export async function deductItemsFromTableTicket(
+  ticketId: string,
+  itemsPaid: { id: string; quantity: number }[],
+): Promise<void> {
+  try {
+    for (const paid of itemsPaid) {
+      const { data: item, error: fetchErr } = await supabase
+        .from("table_ticket_items")
+        .select("id, quantity")
+        .eq("id", paid.id)
+        .maybeSingle();
+      if (fetchErr) throw fetchErr;
+      if (!item) continue;
+
+      const remaining = item.quantity - paid.quantity;
+      if (remaining <= 0) {
+        await supabase.from("table_ticket_items").delete().eq("id", item.id);
+      } else {
+        await supabase.from("table_ticket_items").update({ quantity: remaining }).eq("id", item.id);
+      }
+    }
+
+    // Verificar si quedan ítems en el ticket
+    const { count, error: countErr } = await supabase
+      .from("table_ticket_items")
+      .select("id", { count: "exact", head: true })
+      .eq("ticket_id", ticketId);
+    if (countErr) throw countErr;
+
+    if ((count ?? 0) === 0) {
+      // Liberar las mesas (ON DELETE SET NULL actualiza active_ticket_id)
+      await supabase.from("tables")
+        .update({ status: "available", active_ticket_id: null })
+        .eq("active_ticket_id", ticketId);
+      // Eliminar el ticket (cascade eliminará ítems restantes si los hubiera)
+      await supabase.from("table_tickets").delete().eq("id", ticketId);
+    }
+  } catch (error) {
+    handleSupabaseError(error, "Error al procesar pago del ticket de mesa");
+    throw error;
   }
 }

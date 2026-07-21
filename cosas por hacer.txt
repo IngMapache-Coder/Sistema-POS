@@ -1,0 +1,3 @@
+hacer busqueda por nombre en los clientes
+
+vincular una comanda al mesero que la abrio y que salga en la impresion

@@ -28,8 +28,9 @@ import {
   getConfig,
   getCustomerByDocument,
   saveCustomer,
+  deductItemsFromTableTicket,
 } from "@/lib/database";
-import type { Category, Product, CartItem, Sale, Customer } from "@/lib/types";
+import type { Category, Product, CartItem, Sale, Customer, PendingTableMeta } from "@/lib/types";
 import {
   Minus,
   Plus,
@@ -77,6 +78,7 @@ export function POSInterface() {
 
   const [isCompletingSale, setIsCompletingSale] = useState(false);
   const lastSaleSubmitRef = useRef<number>(0);
+  const [pendingTableMeta, setPendingTableMeta] = useState<PendingTableMeta | null>(null);
 
   // --- Estados para el modal de facturación al imprimir ---
   const [showPrintCustomerDialog, setShowPrintCustomerDialog] = useState(false);
@@ -121,6 +123,26 @@ export function POSInterface() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Detectar si hay un pago de mesa pendiente desde localStorage
+  useEffect(() => {
+    const raw = localStorage.getItem("pos_pending_table_items");
+    const metaRaw = localStorage.getItem("pos_pending_table_meta");
+    if (raw && metaRaw) {
+      try {
+        const items: CartItem[] = JSON.parse(raw);
+        const meta: PendingTableMeta = JSON.parse(metaRaw);
+        setCart(items);
+        setPendingTableMeta(meta);
+        localStorage.removeItem("pos_pending_table_items");
+        // meta se limpia tras completar el cobro
+      } catch {
+        localStorage.removeItem("pos_pending_table_items");
+        localStorage.removeItem("pos_pending_table_meta");
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -392,6 +414,27 @@ export function POSInterface() {
       clearCart();
       setShowPaymentDialog(false);
       setProductsTimestamp(Date.now());
+
+      // Si era un cobro de mesa, deducir los ítems del ticket
+      if (pendingTableMeta) {
+        try {
+          await deductItemsFromTableTicket(pendingTableMeta.ticketId, pendingTableMeta.items);
+          localStorage.removeItem("pos_pending_table_meta");
+          setPendingTableMeta(null);
+          toast({
+            title: "Mesa actualizada",
+            description: `Ticket de ${pendingTableMeta.tableNames.join(", ")} actualizado correctamente`,
+          });
+          // Regresar a la vista de mesas
+          setTimeout(() => { window.location.href = "/mesas"; }, 800);
+        } catch {
+          toast({
+            title: "Advertencia",
+            description: "Venta registrada, pero no se pudo actualizar el ticket de mesa automáticamente",
+            variant: "destructive",
+          });
+        }
+      }
     } catch (error) {
       console.error("Error completing sale:", error);
       toast({
@@ -611,9 +654,9 @@ export function POSInterface() {
           ${customer ? `
           <div class="line"></div>
           <div style="margin-bottom:8px;">
-            <div style="font-size:11px;text-align:center;color:#555;margin-bottom:2px;">FACTURA A NOMBRE DE:</div>
-            <div style="font-size:13px;font-weight:bold;text-align:center;">${customer.name}</div>
-            <div style="font-size:11px;text-align:center;color:#555;">${customer.documentType.toUpperCase()}: ${customer.documentNumber}</div>
+            <div style="font-size:13px;font-weight:bold;text-align:center;color:#555;margin-bottom:2px;">FACTURA A NOMBRE DE:</div>
+            <div style="font-size:15px;font-weight:bold;text-align:center;">${customer.name}</div>
+            <div style="font-size:13px;font-weight:bold;text-align:center;color:#555;">${customer.documentType.toUpperCase()}: ${customer.documentNumber}</div>
           </div>
           ` : ""}
           
