@@ -190,3 +190,36 @@ export interface ManualAdjustment {
   description: string;
   notes?: string;
 }
+
+// --- Mesas (Tables) ---
+export interface Table {
+  id: string;
+  name: string;
+  status: "available" | "busy";
+  activeTicketId: string | null;
+  createdAt: string;
+}
+
+export interface TableTicket {
+  id: string;
+  openedBy?: string | null;
+  createdAt: string;
+}
+
+export interface TableTicketItem {
+  id: string;
+  ticketId: string;
+  productId: string;
+  productName: string;
+  productPrice: number;
+  quantity: number;
+  notes: string | null;
+  createdAt: string;
+}
+
+/** Metadatos guardados en localStorage para deducir ítems del ticket de mesa al completar el cobro en el POS */
+export interface PendingTableMeta {
+  ticketId: string;
+  tableNames: string[];
+  items: { id: string; quantity: number }[];
+}

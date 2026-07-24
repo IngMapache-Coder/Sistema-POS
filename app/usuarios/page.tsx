@@ -56,6 +56,7 @@ const ROLES = [
   { value: "admin", label: "Administrador" },
   { value: "cashier", label: "Cajero" },
   { value: "employee", label: "Empleado" },
+  { value: "waiter", label: "Mesero" },
 ];
 
 export default function UsuariosPage() {
@@ -236,17 +237,19 @@ export default function UsuariosPage() {
       admin: "bg-purple-100 text-purple-800 border-purple-200",
       cashier: "bg-blue-100 text-blue-800 border-blue-200",
       employee: "bg-green-100 text-green-800 border-green-200",
+      waiter: "bg-amber-100 text-amber-800 border-amber-200",
     };
 
     const labels: Record<string, string> = {
       admin: "Administrador",
       cashier: "Cajero",
       employee: "Empleado",
+      waiter: "Mesero",
     };
 
     return (
-      <Badge variant="outline" className={colors[role]}>
-        {labels[role]}
+      <Badge variant="outline" className={colors[role] || "bg-gray-100 text-gray-800 border-gray-200"}>
+        {labels[role] || role}
       </Badge>
     );
   };

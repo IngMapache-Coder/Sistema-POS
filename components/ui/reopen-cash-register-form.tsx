@@ -21,7 +21,7 @@ export function ReopenCashRegisterForm({
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleReopen = () => {
+  const handleReopen = async () => {
     if (!password.trim()) {
       toast({
         title: "Contraseña requerida",
@@ -33,10 +33,11 @@ export function ReopenCashRegisterForm({
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      const success = reopenCashRegister(password);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const res = await reopenCashRegister(password);
 
-      if (success) {
+      if (res.success) {
         toast({
           title: "Caja reabierta exitosamente",
           description:
@@ -47,13 +48,20 @@ export function ReopenCashRegisterForm({
       } else {
         toast({
           title: "Contraseña incorrecta",
-          description: "La contraseña ingresada no es válida",
+          description: res.message || "La contraseña ingresada no es válida",
           variant: "destructive",
         });
       }
-
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Error",
+        description: "Ocurrió un error al reabrir la caja",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 500);
+    }
   };
 
   return (

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import {
   ShoppingCart,
   UtensilsCrossed,
+  Utensils,
   Users,
   Receipt,
   Calculator,
@@ -24,6 +25,7 @@ import { useEffect, useState } from "react"
 
 const navigation = [
   { name: "Ventas", href: "/", icon: ShoppingCart, roles: ["admin", "cashier", "employee"] },
+  //{ name: "Mesas", href: "/mesas", icon: Utensils, roles: ["admin", "waiter", "cashier"] },
   { name: "Menu", href: "/menu", icon: UtensilsCrossed, roles: ["admin"] },
   { name: "Empleados", href: "/empleados", icon: Users, roles: ["admin", "cashier"] },
   { name: "Usuarios", href: "/usuarios", icon: Shield, roles: ["admin"] },
@@ -69,7 +71,8 @@ export function AppSidebar() {
     const roles: Record<string, string> = {
       admin: "Administrador",
       cashier: "Cajero",
-      employee: "Empleado"
+      employee: "Empleado",
+      waiter: "Mesero",
     }
     return roles[role] || role
   }
