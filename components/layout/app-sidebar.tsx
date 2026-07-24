@@ -25,7 +25,7 @@ import { useEffect, useState } from "react"
 
 const navigation = [
   { name: "Ventas", href: "/", icon: ShoppingCart, roles: ["admin", "cashier", "employee"] },
-  { name: "Mesas", href: "/mesas", icon: Utensils, roles: ["admin", "waiter", "cashier"] },
+  //{ name: "Mesas", href: "/mesas", icon: Utensils, roles: ["admin", "waiter", "cashier"] },
   { name: "Menu", href: "/menu", icon: UtensilsCrossed, roles: ["admin"] },
   { name: "Empleados", href: "/empleados", icon: Users, roles: ["admin", "cashier"] },
   { name: "Usuarios", href: "/usuarios", icon: Shield, roles: ["admin"] },
