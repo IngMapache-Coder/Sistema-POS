@@ -25,6 +25,7 @@ import {
   updateTable,
   deleteTable,
   createTableTicket,
+  getTableTicket,
   groupTablesUnderTicket,
   ungroupTables,
   getTableTicketItems,
@@ -66,7 +67,7 @@ function fmt(n: number) {
 }
 
 // ─── Print kitchen ticket ─────────────────────────────────────
-function printKitchenTicket(tableNames: string[], items: TableTicketItem[]) {
+function printKitchenTicket(tableNames: string[], items: TableTicketItem[], waiterName?: string) {
   const win = window.open("", "_blank", "width=350,height=600");
   if (!win) return;
   const rows = items
@@ -75,6 +76,8 @@ function printKitchenTicket(tableNames: string[], items: TableTicketItem[]) {
         `<tr><td style="padding:4px 6px;font-weight:600;">${i.quantity}x</td><td style="padding:4px 6px;">${i.productName}</td><td style="padding:4px 6px;color:#555;">${i.notes ? i.notes : ""}</td></tr>`,
     )
     .join("");
+  const currentUser = getCurrentUser();
+  const displayWaiter = waiterName || currentUser?.name || currentUser?.username;
   win.document.write(`<!DOCTYPE html><html><head><title>Comanda</title>
   <style>
     body{font-family:monospace;font-size:13px;width:300px;margin:0 auto;padding:8px;}
@@ -87,8 +90,9 @@ function printKitchenTicket(tableNames: string[], items: TableTicketItem[]) {
   <body>
     <h2>COMANDA</h2>
     <div class="sep"></div>
-    <p style="text-align:center;font-weight:bold;font-size:15px;">MESA: ${tableNames.join(" + ")}</p>
-    <p style="text-align:center;font-size:11px;color:#555;">${new Date().toLocaleString("es-CO")}</p>
+    <p style="text-align:center;font-weight:bold;font-size:15px;margin:2px 0;">MESA: ${tableNames.join(" + ")}</p>
+    ${displayWaiter ? `<p style="text-align:center;font-weight:bold;font-size:13px;margin:2px 0;color:#333;">MESERO: ${displayWaiter}</p>` : ""}
+    <p style="text-align:center;font-size:11px;color:#555;margin:2px 0;">${new Date().toLocaleString("es-CO")}</p>
     <div class="sep"></div>
     <table><thead><tr><th>CANT</th><th>PRODUCTO</th><th>NOTAS</th></tr></thead>
     <tbody>${rows}</tbody></table>
@@ -116,6 +120,7 @@ export default function MesasPage() {
   const [ticketItems, setTicketItems] = useState<TableTicketItem[]>([]);
   const [ticketLoading, setTicketLoading] = useState(false);
   const [showTicketPanel, setShowTicketPanel] = useState(false);
+  const [activeTicketWaiter, setActiveTicketWaiter] = useState<string | null>(null);
 
   // Add product drawer
   const [categories, setCategories] = useState<Category[]>([]);
@@ -183,18 +188,26 @@ export default function MesasPage() {
       );
       setGroupedTables(siblings);
       setTicketLoading(true);
-      const items = await getTableTicketItems(table.activeTicketId);
+      const [items, ticket] = await Promise.all([
+        getTableTicketItems(table.activeTicketId),
+        getTableTicket(table.activeTicketId),
+      ]);
       setTicketItems(items);
+      setActiveTicketWaiter(ticket?.openedBy || null);
       setTicketLoading(false);
     } else {
       setGroupedTables([table]);
+      setActiveTicketWaiter(null);
     }
   };
 
   const handleOpenTicket = async () => {
     if (!selectedTable) return;
     try {
-      await createTableTicket([selectedTable.id]);
+      const user = getCurrentUser();
+      const waiterName = user?.name || user?.username || "Mesero";
+      await createTableTicket([selectedTable.id], waiterName);
+      setActiveTicketWaiter(waiterName);
       await loadTables();
       // Reopen with refreshed data
       const updated = await getTables();
@@ -203,7 +216,7 @@ export default function MesasPage() {
       setSelectedTable(t);
       setGroupedTables([t]);
       setTicketItems([]);
-      toast({ title: "Comanda abierta", description: `Mesa ${t.name} marcada como ocupada` });
+      toast({ title: "Comanda abierta", description: `Mesa ${t.name} ocupada (Mesero: ${waiterName})` });
     } catch {
       toast({ title: "Error", description: "No se pudo abrir la comanda", variant: "destructive" });
     }
@@ -329,7 +342,9 @@ export default function MesasPage() {
         if (free.length > 0) await groupTablesUnderTicket(free, busy.activeTicketId!);
       } else {
         // All free — create new ticket
-        await createTableTicket(groupSelection);
+        const user = getCurrentUser();
+        const waiterName = user?.name || user?.username || "Mesero";
+        await createTableTicket(groupSelection, waiterName);
       }
       setGroupSelection([]);
       setShowGroupDialog(false);
@@ -729,7 +744,7 @@ export default function MesasPage() {
                     <Button
                       variant="outline"
                       className="flex-1"
-                      onClick={() => printKitchenTicket(groupedTables.map((t) => t.name), ticketItems)}
+                      onClick={() => printKitchenTicket(groupedTables.map((t) => t.name), ticketItems, activeTicketWaiter || undefined)}
                       disabled={ticketItems.length === 0}
                     >
                       <Printer className="h-4 w-4 mr-1" /> Comanda

@@ -28,6 +28,7 @@ import {
   getConfig,
   getCustomerByDocument,
   saveCustomer,
+  searchCustomers,
   deductItemsFromTableTicket,
 } from "@/lib/database";
 import type { Category, Product, CartItem, Sale, Customer, PendingTableMeta } from "@/lib/types";
@@ -91,6 +92,10 @@ export function POSInterface() {
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
   const [isSavingCustomer, setIsSavingCustomer] = useState(false);
 
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  const [customerSearchResults, setCustomerSearchResults] = useState<Customer[]>([]);
+  const [hasSearchedQuery, setHasSearchedQuery] = useState(false);
+
   const resetPrintCustomerState = () => {
     setPrintCustomerEnabled(false);
     setPrintDocType("cc");
@@ -98,6 +103,9 @@ export function POSInterface() {
     setPrintCustomerName("");
     setFoundCustomer(null);
     setIsSearchingCustomer(false);
+    setCustomerSearchQuery("");
+    setCustomerSearchResults([]);
+    setHasSearchedQuery(false);
   };
 
   const loadData = useCallback(async () => {
@@ -498,6 +506,32 @@ export function POSInterface() {
     setSaleToPrint(sale);
     resetPrintCustomerState();
     setShowPrintCustomerDialog(true);
+  };
+
+  const handleSearchCustomerQuery = async (query: string) => {
+    if (!query.trim()) {
+      setCustomerSearchResults([]);
+      setHasSearchedQuery(false);
+      return;
+    }
+    setIsSearchingCustomer(true);
+    try {
+      const results = await searchCustomers(query);
+      setCustomerSearchResults(results);
+      setHasSearchedQuery(true);
+    } catch {
+      setCustomerSearchResults([]);
+    } finally {
+      setIsSearchingCustomer(false);
+    }
+  };
+
+  const selectCustomer = (customer: Customer) => {
+    setFoundCustomer(customer);
+    setPrintDocType(customer.documentType);
+    setPrintDocNumber(customer.documentNumber);
+    setPrintCustomerName(customer.name);
+    setCustomerSearchResults([]);
   };
 
   const handleSearchCustomer = async () => {
@@ -1415,82 +1449,129 @@ export function POSInterface() {
             </div>
           ) : (
             <div className="space-y-4 py-2">
-              {/* Tipo de documento */}
+              {/* Buscador unificado por Nombre o Documento */}
               <div className="space-y-2">
-                <Label>Tipo de Documento</Label>
-                <div className="flex gap-2">
-                  <Button
-                    variant={printDocType === "cc" ? "default" : "outline"}
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => {
-                      setPrintDocType("cc");
-                      setPrintDocNumber("");
-                      setPrintCustomerName("");
-                      setFoundCustomer(null);
-                    }}
-                  >
-                    CC - Persona Natural
-                  </Button>
-                  <Button
-                    variant={printDocType === "nit" ? "default" : "outline"}
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => {
-                      setPrintDocType("nit");
-                      setPrintDocNumber("");
-                      setPrintCustomerName("");
-                      setFoundCustomer(null);
-                    }}
-                  >
-                    NIT - Empresa
-                  </Button>
-                </div>
-              </div>
-
-              {/* Número de documento */}
-              <div className="space-y-2">
-                <Label htmlFor="printDocNumber">
-                  {printDocType === "cc" ? "Número de Cédula" : "Número de NIT"}
-                </Label>
+                <Label>Buscar por Nombre o Documento</Label>
                 <div className="flex gap-2">
                   <Input
-                    id="printDocNumber"
-                    value={printDocNumber}
+                    value={customerSearchQuery}
                     onChange={(e) => {
-                      setPrintDocNumber(e.target.value);
-                      setFoundCustomer(null);
-                      setPrintCustomerName("");
+                      setCustomerSearchQuery(e.target.value);
+                      handleSearchCustomerQuery(e.target.value);
                     }}
-                    placeholder={printDocType === "cc" ? "Ej: 1234567890" : "Ej: 900123456-1"}
+                    placeholder="Escribe el nombre o documento..."
                     className="flex-1"
-                    onKeyDown={(e) => e.key === "Enter" && handleSearchCustomer()}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearchCustomerQuery(customerSearchQuery)}
                   />
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={handleSearchCustomer}
-                    disabled={isSearchingCustomer || !printDocNumber.trim()}
+                    onClick={() => handleSearchCustomerQuery(customerSearchQuery)}
+                    disabled={isSearchingCustomer || !customerSearchQuery.trim()}
                     title="Buscar cliente"
                   >
                     <Search className="h-4 w-4" />
                   </Button>
                 </div>
+
+                {/* Lista de resultados de búsqueda por nombre/doc */}
+                {isSearchingCustomer && (
+                  <div className="text-xs text-muted-foreground py-1 flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Buscando clientes...
+                  </div>
+                )}
+                {customerSearchResults.length > 0 && (
+                  <div className="border rounded-md divide-y max-h-36 overflow-y-auto bg-popover shadow-md my-1">
+                    {customerSearchResults.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-accent flex justify-between items-center transition-colors"
+                        onClick={() => selectCustomer(c)}
+                      >
+                        <div>
+                          <div className="font-medium text-foreground">{c.name}</div>
+                          <div className="text-muted-foreground">{c.documentType.toUpperCase()}: {c.documentNumber}</div>
+                        </div>
+                        <UserCheck className="h-4 w-4 text-green-600 shrink-0 ml-2" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {hasSearchedQuery && customerSearchResults.length === 0 && !isSearchingCustomer && customerSearchQuery.trim() && (
+                  <p className="text-xs text-muted-foreground">No se encontraron clientes coincidentes. Puedes llenar los datos abajo para registrarlo.</p>
+                )}
               </div>
 
-              {/* Indicador de cliente encontrado / nuevo */}
-              {foundCustomer && (
-                <div className="flex items-center gap-2 rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-2">
-                  <UserCheck className="h-4 w-4 text-green-600 shrink-0" />
-                  <span className="text-sm text-green-700 font-medium">Cliente registrado</span>
+              <div className="border-t pt-3 space-y-4">
+                {/* Tipo de documento */}
+                <div className="space-y-2">
+                  <Label>Tipo de Documento</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={printDocType === "cc" ? "default" : "outline"}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => {
+                        setPrintDocType("cc");
+                        setPrintDocNumber("");
+                        setPrintCustomerName("");
+                        setFoundCustomer(null);
+                      }}
+                    >
+                      CC - Persona Natural
+                    </Button>
+                    <Button
+                      variant={printDocType === "nit" ? "default" : "outline"}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => {
+                        setPrintDocType("nit");
+                        setPrintDocNumber("");
+                        setPrintCustomerName("");
+                        setFoundCustomer(null);
+                      }}
+                    >
+                      NIT - Empresa
+                    </Button>
+                  </div>
                 </div>
-              )}
-              {!foundCustomer && printDocNumber.trim() && !isSearchingCustomer && (
-                <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2">
-                  <UserPlus className="h-4 w-4 text-amber-600 shrink-0" />
-                  <span className="text-sm text-amber-700">Cliente nuevo — se registrará automáticamente</span>
+
+                {/* Número de documento */}
+                <div className="space-y-2">
+                  <Label htmlFor="printDocNumber">
+                    {printDocType === "cc" ? "Número de Cédula" : "Número de NIT"}
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="printDocNumber"
+                      value={printDocNumber}
+                      onChange={(e) => {
+                        setPrintDocNumber(e.target.value);
+                        setFoundCustomer(null);
+                        setPrintCustomerName("");
+                      }}
+                      placeholder={printDocType === "cc" ? "Ej: 1234567890" : "Ej: 900123456-1"}
+                      className="flex-1"
+                      onKeyDown={(e) => e.key === "Enter" && handleSearchCustomer()}
+                    />
+                  </div>
                 </div>
-              )}
+
+                {/* Indicador de cliente encontrado / nuevo */}
+                {foundCustomer && (
+                  <div className="flex items-center gap-2 rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-2">
+                    <UserCheck className="h-4 w-4 text-green-600 shrink-0" />
+                    <span className="text-sm text-green-700 font-medium">Cliente seleccionado / registrado</span>
+                  </div>
+                )}
+                {!foundCustomer && printDocNumber.trim() && !isSearchingCustomer && (
+                  <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+                    <UserPlus className="h-4 w-4 text-amber-600 shrink-0" />
+                    <span className="text-sm text-amber-700">Cliente nuevo — se registrará automáticamente</span>
+                  </div>
+                )}
+              </div>
 
               {/* Nombre */}
               <div className="space-y-2">

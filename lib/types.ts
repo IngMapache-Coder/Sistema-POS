@@ -202,6 +202,7 @@ export interface Table {
 
 export interface TableTicket {
   id: string;
+  openedBy?: string | null;
   createdAt: string;
 }
 

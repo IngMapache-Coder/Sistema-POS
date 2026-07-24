@@ -569,6 +569,31 @@ export async function getCustomerByDocument(
   }
 }
 
+export async function searchCustomers(query: string): Promise<Customer[]> {
+  if (!query || !query.trim()) return [];
+  try {
+    const cleanQuery = query.trim();
+    const { data, error } = await supabase
+      .from("customers")
+      .select("*")
+      .or(`name.ilike.%${cleanQuery}%,document_number.ilike.%${cleanQuery}%`)
+      .limit(10);
+
+    if (error) throw error;
+    return (data || []).map((d: any) => ({
+      id: d.id,
+      name: d.name,
+      documentType: d.document_type,
+      documentNumber: d.document_number,
+      createdAt: d.created_at,
+      updatedAt: d.updated_at,
+    }));
+  } catch (error) {
+    handleSupabaseError(error, "Error al buscar clientes");
+    return [];
+  }
+}
+
 export async function saveCustomer(
   customer: Omit<Customer, "id" | "createdAt" | "updatedAt">,
 ): Promise<Customer> {
@@ -2118,14 +2143,65 @@ export async function deleteTable(id: string): Promise<void> {
   }
 }
 
-/** Crea un nuevo ticket y asigna las mesas indicadas, marcándolas como ocupadas. */
-export async function createTableTicket(tableIds: string[]): Promise<TableTicket> {
+/** Obtiene un ticket de mesa por ID */
+export async function getTableTicket(ticketId: string): Promise<TableTicket | null> {
   try {
-    const { data: ticket, error: ticketError } = await supabase
+    const { data, error } = await supabase
       .from("table_tickets")
-      .insert({})
-      .select()
-      .single();
+      .select("*")
+      .eq("id", ticketId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return {
+      id: data.id,
+      openedBy: data.opened_by || null,
+      createdAt: data.created_at,
+    };
+  } catch (error) {
+    handleSupabaseError(error, "Error al consultar comanda");
+    return null;
+  }
+}
+
+/** Crea un nuevo ticket y asigna las mesas indicadas, marcándolas como ocupadas. */
+export async function createTableTicket(
+  tableIds: string[],
+  openedBy?: string,
+): Promise<TableTicket> {
+  try {
+    let ticket: any;
+    let ticketError: any;
+
+    if (openedBy) {
+      const res = await supabase
+        .from("table_tickets")
+        .insert({ opened_by: openedBy })
+        .select()
+        .single();
+      if (res.error && res.error.message?.includes("opened_by")) {
+        // Fallback si la columna opened_by no existe aún en DB
+        const fallback = await supabase
+          .from("table_tickets")
+          .insert({})
+          .select()
+          .single();
+        ticket = fallback.data;
+        ticketError = fallback.error;
+      } else {
+        ticket = res.data;
+        ticketError = res.error;
+      }
+    } else {
+      const res = await supabase
+        .from("table_tickets")
+        .insert({})
+        .select()
+        .single();
+      ticket = res.data;
+      ticketError = res.error;
+    }
+
     if (ticketError) throw ticketError;
 
     const { error: updateError } = await supabase
@@ -2134,7 +2210,7 @@ export async function createTableTicket(tableIds: string[]): Promise<TableTicket
       .in("id", tableIds);
     if (updateError) throw updateError;
 
-    return { id: ticket.id, createdAt: ticket.created_at };
+    return { id: ticket.id, openedBy: ticket.opened_by || openedBy || null, createdAt: ticket.created_at };
   } catch (error) {
     handleSupabaseError(error, "Error al abrir comanda");
     throw error;
