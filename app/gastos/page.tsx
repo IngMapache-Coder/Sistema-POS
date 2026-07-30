@@ -407,10 +407,6 @@ export default function GastosPage() {
                   })}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {allExpenses.length} gasto{allExpenses.length !== 1 ? "s" : ""}{" "}
-                en total
-              </p>
             </CardContent>
           </Card>
 
