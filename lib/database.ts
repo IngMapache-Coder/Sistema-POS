@@ -722,6 +722,19 @@ export async function getExpenses(): Promise<Expense[]> {
   }
 }
 
+export async function getTotalExpenses(): Promise<number> {
+  try {
+    const { data, error } = await supabase.rpc("get_total_expenses");
+
+    if (error) throw error;
+
+    return parseFloat(data ?? 0);
+  } catch (error) {
+    handleSupabaseError(error, "Error al obtener el total de gastos");
+    return 0;
+  }
+}
+
 export async function getTodayExpenses(): Promise<Expense[]> {
   try {
     const today = getTodayDate();

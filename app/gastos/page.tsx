@@ -41,6 +41,7 @@ import {
   saveExpense,
   deleteExpense,
   hasDailyClosure,
+  getTotalExpenses,
 } from "@/lib/database";
 import type { Expense } from "@/lib/types";
 import {
@@ -105,6 +106,7 @@ const getCategoryColor = (category: string) => {
 };
 
 export default function GastosPage() {
+  const [totalAll, setTotalAll] = useState(0);
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
   const [todayExpenses, setTodayExpenses] = useState<Expense[]>([]);
   const [showExpenseDialog, setShowExpenseDialog] = useState(false);
@@ -130,9 +132,10 @@ export default function GastosPage() {
 
   const loadData = async () => {
     try {
-      const [allData, todayData] = await Promise.all([
+      const [allData, todayData, total] = await Promise.all([
         getExpenses(),
         getTodayExpenses(),
+        getTotalExpenses(),
       ]);
 
       const sortedAllData = allData.sort(
@@ -142,6 +145,7 @@ export default function GastosPage() {
 
       setAllExpenses(sortedAllData);
       setTodayExpenses(todayData);
+      setTotalAll(total);
     } catch (error) {
       console.error("Error loading expenses:", error);
       toast({
@@ -286,7 +290,6 @@ export default function GastosPage() {
 
   // Calcular totales
   const totalToday = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const totalAll = allExpenses.reduce((sum, e) => sum + e.amount, 0);
   const expensesFromCashRegister = todayExpenses
     .filter((e) => e.paymentMethod === "cash" && e.fromCashRegister)
     .reduce((sum, e) => sum + e.amount, 0);
