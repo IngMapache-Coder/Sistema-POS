@@ -68,33 +68,37 @@ function fmt(n: number) {
 
 // ─── Print kitchen ticket ─────────────────────────────────────
 function printKitchenTicket(tableNames: string[], items: TableTicketItem[], waiterName?: string) {
-  const win = window.open("", "_blank", "width=350,height=600");
+  const win = window.open("", "_blank", "width=380,height=600");
   if (!win) return;
   const rows = items
     .map(
       (i) =>
-        `<tr><td style="padding:4px 6px;font-weight:600;">${i.quantity}x</td><td style="padding:4px 6px;">${i.productName}</td><td style="padding:4px 6px;color:#555;">${i.notes ? i.notes : ""}</td></tr>`,
+        `<tr>
+          <td style="padding:6px 4px;font-weight:bold;font-size:18px;vertical-align:top;white-space:nowrap;">${i.quantity}x</td>
+          <td style="padding:6px 4px;font-weight:600;font-size:16px;vertical-align:top;">${i.productName}</td>
+          <td style="padding:6px 4px;font-size:15px;font-weight:bold;color:#000;vertical-align:top;">${i.notes ? i.notes : ""}</td>
+        </tr>`,
     )
     .join("");
   const currentUser = getCurrentUser();
   const displayWaiter = waiterName || currentUser?.name || currentUser?.username;
   win.document.write(`<!DOCTYPE html><html><head><title>Comanda</title>
   <style>
-    body{font-family:monospace;font-size:13px;width:300px;margin:0 auto;padding:8px;}
-    h2{text-align:center;margin:4px 0;}
-    .sep{border-top:1px dashed #000;margin:6px 0;}
+    body{font-family:monospace;font-size:16px;width:320px;margin:0 auto;padding:8px;color:#000;}
+    h2{text-align:center;margin:6px 0;font-size:22px;font-weight:bold;}
+    .sep{border-top:2px dashed #000;margin:8px 0;}
     table{width:100%;border-collapse:collapse;}
-    th{text-align:left;font-size:11px;color:#666;padding:2px 6px;}
+    th{text-align:left;font-size:14px;font-weight:bold;color:#000;padding:4px;border-bottom:1px solid #000;}
     td{vertical-align:top;}
   </style></head>
   <body>
     <h2>COMANDA</h2>
     <div class="sep"></div>
-    <p style="text-align:center;font-weight:bold;font-size:15px;margin:2px 0;">MESA: ${tableNames.join(" + ")}</p>
-    ${displayWaiter ? `<p style="text-align:center;font-weight:bold;font-size:13px;margin:2px 0;color:#333;">MESERO: ${displayWaiter}</p>` : ""}
-    <p style="text-align:center;font-size:11px;color:#555;margin:2px 0;">${new Date().toLocaleString("es-CO")}</p>
+    <p style="text-align:center;font-weight:bold;font-size:20px;margin:4px 0;">MESA: ${tableNames.join(" + ")}</p>
+    ${displayWaiter ? `<p style="text-align:center;font-weight:bold;font-size:15px;margin:3px 0;">MESERO: ${displayWaiter}</p>` : ""}
+    <p style="text-align:center;font-size:13px;color:#333;margin:3px 0;">${new Date().toLocaleString("es-CO")}</p>
     <div class="sep"></div>
-    <table><thead><tr><th>CANT</th><th>PRODUCTO</th><th>NOTAS</th></tr></thead>
+    <table><thead><tr><th style="width:45px;">CANT</th><th>PRODUCTO</th><th>NOTAS</th></tr></thead>
     <tbody>${rows}</tbody></table>
     <div class="sep"></div>
   </body></html>`);
@@ -124,7 +128,7 @@ export default function MesasPage() {
 
   // Add product drawer
   const [categories, setCategories] = useState<Category[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [productSearch, setProductSearch] = useState("");
   const [showAddProduct, setShowAddProduct] = useState(false);
@@ -151,7 +155,10 @@ export default function MesasPage() {
   const [showCheckoutDialog, setShowCheckoutDialog] = useState(false);
   const [checkedItems, setCheckedItems] = useState<Record<string, number>>({}); // itemId -> qty to pay
 
-  // ── Loaders ────────────────────────────────────────────────
+  // ── Loaders & Realtime ──────────────────────────────────────
+  const selectedTableRef = useRef<Table | null>(null);
+  selectedTableRef.current = selectedTable;
+
   const loadTables = useCallback(async () => {
     setLoading(true);
     const t = await getTables();
@@ -162,18 +169,78 @@ export default function MesasPage() {
   const loadCategories = useCallback(async () => {
     const cats = await getCategories();
     setCategories(cats.sort((a, b) => a.order - b.order));
-    if (cats.length > 0) setSelectedCat(cats[0].id);
+  }, []);
+
+  const loadProducts = useCallback(async () => {
+    const prods = await getProducts();
+    setAllProducts(prods);
+  }, []);
+
+  const refreshCurrentTicket = useCallback(async () => {
+    const currentTable = selectedTableRef.current;
+    const updatedTables = await getTables();
+    setTables(updatedTables);
+
+    if (!currentTable) return;
+    const freshTable = updatedTables.find((t) => t.id === currentTable.id);
+    if (!freshTable) return;
+
+    setSelectedTable(freshTable);
+
+    if (freshTable.activeTicketId) {
+      const siblings = updatedTables.filter(
+        (t) => t.activeTicketId === freshTable.activeTicketId,
+      );
+      setGroupedTables(siblings);
+
+      const [items, ticket] = await Promise.all([
+        getTableTicketItems(freshTable.activeTicketId),
+        getTableTicket(freshTable.activeTicketId),
+      ]);
+      setTicketItems(items);
+      setActiveTicketWaiter(ticket?.openedBy || null);
+    } else {
+      setGroupedTables([freshTable]);
+      setTicketItems([]);
+      setActiveTicketWaiter(null);
+    }
   }, []);
 
   useEffect(() => {
     loadTables();
     loadCategories();
-  }, [loadTables, loadCategories]);
+    loadProducts();
 
-  useEffect(() => {
-    if (!selectedCat) return;
-    getProductsByCategory(selectedCat).then(setProducts);
-  }, [selectedCat]);
+    // Realtime listener
+    const channel = supabase
+      .channel("mesas-realtime-sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "tables" },
+        () => {
+          refreshCurrentTicket();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "table_tickets" },
+        () => {
+          refreshCurrentTicket();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "table_ticket_items" },
+        () => {
+          refreshCurrentTicket();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadTables, loadCategories, loadProducts, refreshCurrentTicket]);
 
   // ── Open ticket ────────────────────────────────────────────
   const openTable = async (table: Table) => {
@@ -462,9 +529,16 @@ export default function MesasPage() {
   };
 
   // ── Filtered products ──────────────────────────────────────
-  const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(productSearch.toLowerCase()),
-  );
+  const filteredProducts = allProducts.filter((p) => {
+    const matchesSearch = p.name.toLowerCase().includes(productSearch.toLowerCase());
+    if (productSearch.trim()) {
+      return matchesSearch;
+    }
+    if (selectedCat) {
+      return p.categoryId === selectedCat;
+    }
+    return true;
+  });
 
   // ── Total ──────────────────────────────────────────────────
   const ticketTotal = ticketItems.reduce(
@@ -574,9 +648,9 @@ export default function MesasPage() {
 
         {/* ── Ticket Panel ── */}
         {showTicketPanel && selectedTable && (
-          <div className="w-full lg:w-[45%] border-l flex flex-col bg-card">
+          <div className="w-full lg:w-[45%] border-l flex flex-col bg-card h-full min-h-0 overflow-hidden">
             {/* Panel header */}
-            <div className="px-5 py-4 border-b flex items-center justify-between">
+            <div className="px-5 py-4 border-b flex items-center justify-between shrink-0">
               <div>
                 <h2 className="font-bold text-lg">
                   {groupedTables.map((t) => t.name).join(" + ")}
@@ -608,7 +682,7 @@ export default function MesasPage() {
             ) : (
               <>
                 {/* Items list */}
-                <ScrollArea className="flex-1 px-5 py-3">
+                <ScrollArea className="flex-1 min-h-0 px-5 py-3">
                   {ticketLoading ? (
                     <div className="flex justify-center py-10">
                       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -679,104 +753,126 @@ export default function MesasPage() {
                   )}
                 </ScrollArea>
 
-                {/* Total */}
-                {ticketItems.length > 0 && (
-                  <div className="px-5 py-2 border-t flex justify-between text-sm font-semibold">
-                    <span>Total comanda</span>
-                    <span className="text-primary text-base">{fmt(ticketTotal)}</span>
-                  </div>
-                )}
-
-                {/* Add product toggle */}
-                <div className="border-t px-5 py-3">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => setShowAddProduct((v) => !v)}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    {showAddProduct ? "Cerrar buscador" : "Agregar producto"}
-                  </Button>
-                  {showAddProduct && (
-                    <div className="mt-3 space-y-2">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Buscar producto…"
-                          className="pl-9"
-                          value={productSearch}
-                          onChange={(e) => setProductSearch(e.target.value)}
-                        />
-                      </div>
-                      {/* Categories */}
-                      <div className="flex gap-1.5 overflow-x-auto pb-1">
-                        {categories.map((cat) => (
-                          <Button
-                            key={cat.id}
-                            size="sm"
-                            variant={selectedCat === cat.id ? "default" : "outline"}
-                            className="shrink-0 text-xs h-7"
-                            onClick={() => setSelectedCat(cat.id)}
-                          >
-                            {cat.name}
-                          </Button>
-                        ))}
-                      </div>
-                      <div className="max-h-60 overflow-y-auto pr-1 space-y-1">
-                        {filteredProducts.map((p) => (
-                          <button
-                            key={p.id}
-                            onClick={() => handleAddProduct(p)}
-                            className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-accent text-sm text-left"
-                          >
-                            <span>{p.name}</span>
-                            <span className="text-muted-foreground text-xs">{fmt(p.price)}</span>
-                          </button>
-                        ))}
-                      </div>
+                {/* Footer fixed section */}
+                <div className="shrink-0 border-t bg-card">
+                  {/* Total */}
+                  {ticketItems.length > 0 && (
+                    <div className="px-5 py-2 flex justify-between text-sm font-semibold">
+                      <span>Total comanda</span>
+                      <span className="text-primary text-base">{fmt(ticketTotal)}</span>
                     </div>
                   )}
-                </div>
 
-                {/* Actions */}
-                <div className="px-5 py-4 border-t flex flex-col gap-2">
-                  <div className="flex gap-2 w-full">
+                  {/* Add product toggle */}
+                  <div className="border-t px-5 py-3">
                     <Button
                       variant="outline"
-                      className="flex-1"
-                      onClick={() => printKitchenTicket(groupedTables.map((t) => t.name), ticketItems, activeTicketWaiter || undefined)}
-                      disabled={ticketItems.length === 0}
+                      className="w-full"
+                      onClick={() => setShowAddProduct((v) => !v)}
                     >
-                      <Printer className="h-4 w-4 mr-1" /> Comanda
+                      <Plus className="h-4 w-4 mr-2" />
+                      {showAddProduct ? "Cerrar buscador" : "Agregar producto"}
                     </Button>
-                    {canCheckout && (
+                    {showAddProduct && (
+                      <div className="mt-3 space-y-2">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Buscar producto…"
+                            className="pl-9 pr-8"
+                            value={productSearch}
+                            onChange={(e) => setProductSearch(e.target.value)}
+                          />
+                          {productSearch && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="absolute right-1 top-1 h-7 w-7 text-muted-foreground hover:text-foreground"
+                              onClick={() => setProductSearch("")}
+                              title="Limpiar búsqueda"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                        {/* Categories */}
+                        <div className="flex gap-1.5 overflow-x-auto pb-1">
+                          <Button
+                            size="sm"
+                            variant={selectedCat === null ? "default" : "outline"}
+                            className="shrink-0 text-xs h-7"
+                            onClick={() => setSelectedCat(null)}
+                          >
+                            Todas
+                          </Button>
+                          {categories.map((cat) => (
+                            <Button
+                              key={cat.id}
+                              size="sm"
+                              variant={selectedCat === cat.id ? "default" : "outline"}
+                              className="shrink-0 text-xs h-7"
+                              onClick={() => setSelectedCat(cat.id)}
+                            >
+                              {cat.name}
+                            </Button>
+                          ))}
+                        </div>
+                        <div className="max-h-44 overflow-y-auto pr-1 space-y-1">
+                          {filteredProducts.map((p) => (
+                            <button
+                              key={p.id}
+                              onClick={() => handleAddProduct(p)}
+                              className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-accent text-sm text-left"
+                            >
+                              <span>{p.name}</span>
+                              <span className="text-muted-foreground text-xs">{fmt(p.price)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="px-5 py-4 border-t flex flex-col gap-2">
+                    <div className="flex gap-2 w-full">
                       <Button
-                        className="flex-1 bg-success text-success-foreground hover:bg-success/90"
-                        onClick={openCheckout}
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => printKitchenTicket(groupedTables.map((t) => t.name), ticketItems, activeTicketWaiter || undefined)}
                         disabled={ticketItems.length === 0}
                       >
-                        <ShoppingCart className="h-4 w-4 mr-1" /> Cobrar
+                        <Printer className="h-4 w-4 mr-1" /> Comanda
+                      </Button>
+                      {canCheckout && (
+                        <Button
+                          className="flex-1 bg-success text-success-foreground hover:bg-success/90"
+                          onClick={openCheckout}
+                          disabled={ticketItems.length === 0}
+                        >
+                          <ShoppingCart className="h-4 w-4 mr-1" /> Cobrar
+                        </Button>
+                      )}
+                    </div>
+                    {ticketItems.length === 0 && (
+                      <Button
+                        variant="destructive"
+                        className="w-full text-xs h-9"
+                        onClick={handleCloseEmptyTicket}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" /> Cerrar Comanda Vacía
+                      </Button>
+                    )}
+                    {canGroup && groupedTables.length > 1 && ticketItems.length === 0 && (
+                      <Button
+                        variant="outline"
+                        className="w-full text-xs text-destructive hover:text-destructive h-9"
+                        onClick={handleUngroupTables}
+                      >
+                        <Link2Off className="h-3.5 w-3.5 mr-1" /> Deshacer Unión de Mesas
                       </Button>
                     )}
                   </div>
-                  {ticketItems.length === 0 && (
-                    <Button
-                      variant="destructive"
-                      className="w-full text-xs h-9"
-                      onClick={handleCloseEmptyTicket}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" /> Cerrar Comanda Vacía
-                    </Button>
-                  )}
-                  {canGroup && groupedTables.length > 1 && ticketItems.length === 0 && (
-                    <Button
-                      variant="outline"
-                      className="w-full text-xs text-destructive hover:text-destructive h-9"
-                      onClick={handleUngroupTables}
-                    >
-                      <Link2Off className="h-3.5 w-3.5 mr-1" /> Deshacer Unión de Mesas
-                    </Button>
-                  )}
                 </div>
               </>
             )}
